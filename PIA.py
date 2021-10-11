@@ -5,8 +5,8 @@
 # https://github.com/michabirklbauer/
 # micha.birklbauer@gmail.com
 
-version = "1.0.0"
-date = "20210901"
+version = "1.0.1"
+date = "20211011"
 
 """
 DESCRIPTION

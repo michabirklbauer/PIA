@@ -638,7 +638,8 @@ class Comparison:
              width = 20,
              height = 5,
              sig_digits = 2,
-             label_offset = 0.05):
+             label_offset = 0.05,
+             block = True):
 
         """
         -- DESCRIPTION --
@@ -660,6 +661,9 @@ class Comparison:
                 DEFAULT: 2
             - label_offset (float): space between bars and text
                 DEFAULT: 0.05
+            - block (bool): whether to wait for all figures to be closed before
+                            returning
+                DEFAULT: True
           RETURNS:
             - plot as matplotlib.pyplot.fig object
         """
@@ -691,7 +695,7 @@ class Comparison:
         plt.legend([self.name_a, self.name_b])
         if filename is not None:
             fig.savefig(filename, bbox_inches = "tight", dpi = 150)
-        plt.show()
+        plt.show(block = block)
 
         return fig
 

@@ -21,7 +21,6 @@ import warnings
 import numpy as np
 import pandas as pd
 from itertools import islice
-import matplotlib.pyplot as plt
 import PIAScore
 from PIA import PIA
 from PIA import Preparation

@@ -21,6 +21,7 @@ import warnings
 import numpy as np
 import pandas as pd
 from itertools import islice
+import matplotlib.pyplot as plt
 import PIAScore
 from PIA import PIA
 from PIA import Preparation
@@ -38,7 +39,13 @@ class PIAModel:
     negatives = None
     strategy = None
     cutoff = None
+    statistics = None
+
+    # trainable attributes (optional)
     train_results = None
+    plot_train = None
+    plot_val = None
+    plot_test = None
 
     # constructor - initialize a scoring model
     def __init__(self,
@@ -61,7 +68,7 @@ class PIAModel:
             self.negatives = data["negatives"]
             self.strategy = data["strategy"]
             self.cutoff = int(data["cutoff"])
-            self.train_results = data["results"]
+            self.statistics = data["statistics"]
         else:
             self.positives = positives
             self.negatives = negatives
@@ -75,6 +82,7 @@ class PIAModel:
               sdf_file_2 = None,
               plot_prefix = None,
               keep_files = False,
+              block = False,
               verbose = 1):
 
         """
@@ -112,15 +120,15 @@ class PIAModel:
         ligands = p.get_ligands(filename)
         sdf_metainfo = p.get_sdf_metainfo(filename)
         ligand_names = sdf_metainfo["names"]
-        structures = p.add_ligands_multi(pdb_base_structure + "_cleaned.pdb", "piamodel_structures_tmp", ligands)
+        structures = p.add_ligands_multi(pdb_base_structure + "_cleaned.pdb", "piamodel_structures_tmp", ligands, verbose = verbose)
         # PIA
-        result = PIA(structures, ligand_names = ligand_names, poses = "best", path = "current")
+        result = PIA(structures, ligand_names = ligand_names, poses = "best", path = "current", verbose = verbose)
         # scoring preparation
         s = Scoring(result.pdb_entry_results, result.best_pdb_entries)
         # generate datasets
-        df_train, df_val, df_test = s.generate_datasets(train_output = "piamodel_data_train_tmp.csv",
-                                                        val_output = "piamodel_data_val_tmp.csv",
-                                                        test_output = "piamodel_data_test_tmp.csv")
+        data_train, data_val, data_test = s.generate_datasets(train_output = "piamodel_data_train_tmp.csv",
+                                                              val_output = "piamodel_data_val_tmp.csv",
+                                                              test_output = "piamodel_data_test_tmp.csv")
         # compare actives and inactives
         ia_info = s.get_actives_inactives()
         comp_train = s.compare(partition = "train")
@@ -128,11 +136,15 @@ class PIAModel:
         comp_test = s.compare(partition = "test")
         # get feature names and information
         features = s.get_feature_information(filename = "piamodel_features_tmp.csv")
-        # plot comparisons if plot_prefix is specified
+        # plot comparisons, if plot_prefix is specified save them
         if plot_prefix is not None:
-            comp_train.plot("Actives vs. Inactives - Training Set", filename = plot_prefix + "_comparison_train.png")
-            comp_val.plot("Actives vs. Inactives - Validation Set", filename = plot_prefix + "_comparison_val.png")
-            comp_test.plot("Actives vs. Inactives - Test Set", filename = plot_prefix + "_comparison_test.png")
+            self.plot_train = comp_train.plot("Actives vs. Inactives - Training Set", filename = plot_prefix + "_comparison_train.png", block = block)
+            self.plot_val = comp_val.plot("Actives vs. Inactives - Validation Set", filename = plot_prefix + "_comparison_val.png", block = block)
+            self.plot_test = comp_test.plot("Actives vs. Inactives - Test Set", filename = plot_prefix + "_comparison_test.png", block = block)
+        else:
+            self.plot_train = comp_train.plot("Actives vs. Inactives - Training Set", block = block)
+            self.plot_val = comp_val.plot("Actives vs. Inactives - Validation Set", block = block)
+            self.plot_test = comp_test.plot("Actives vs. Inactives - Test Set", block = block)
 
         # scoring
         # get optimal features
@@ -150,6 +162,8 @@ class PIAModel:
             print("Finished optimal feature calculation!")
         # get feature impact
         self.positives, self.negatives = PIAScore.get_feature_impact(features_filtered)
+        positives = self.positives
+        negatives = self.negatives
         # prepare training, validation and test data
         ## make data copies
         train_result_strat1 = data_train.copy()
@@ -167,10 +181,10 @@ class PIAModel:
         train_result_strat3_sorted = train_result_strat3.sort_values(by = "SCORE", ascending = False)
         train_result_strat4_sorted = train_result_strat4.sort_values(by = "SCORE", ascending = False)
         # determine cutoffs
-        cutoff_strat1 = get_cutoff(train_result_strat1["LABEL"].to_list(), train_result_strat1["SCORE"].to_list())[0]
-        cutoff_strat2 = get_cutoff(train_result_strat2["LABEL"].to_list(), train_result_strat2["SCORE"].to_list())[0]
-        cutoff_strat3 = get_cutoff(train_result_strat3["LABEL"].to_list(), train_result_strat3["SCORE"].to_list())[0]
-        cutoff_strat4 = get_cutoff(train_result_strat4["LABEL"].to_list(), train_result_strat4["SCORE"].to_list())[0]
+        cutoff_strat1 = PIAScore.get_cutoff(train_result_strat1["LABEL"].to_list(), train_result_strat1["SCORE"].to_list())[0]
+        cutoff_strat2 = PIAScore.get_cutoff(train_result_strat2["LABEL"].to_list(), train_result_strat2["SCORE"].to_list())[0]
+        cutoff_strat3 = PIAScore.get_cutoff(train_result_strat3["LABEL"].to_list(), train_result_strat3["SCORE"].to_list())[0]
+        cutoff_strat4 = PIAScore.get_cutoff(train_result_strat4["LABEL"].to_list(), train_result_strat4["SCORE"].to_list())[0]
         ## make data copies
         val_result_strat1 = data_val.copy()
         val_result_strat2 = data_val.copy()
@@ -201,6 +215,26 @@ class PIAModel:
         test_result_strat2_sorted = test_result_strat2.sort_values(by = "SCORE", ascending = False)
         test_result_strat3_sorted = test_result_strat3.sort_values(by = "SCORE", ascending = False)
         test_result_strat4_sorted = test_result_strat4.sort_values(by = "SCORE", ascending = False)
+        # set optimal cutoff and strategy
+        if strat == "strat1":
+            best_strategy = "+"
+            self.strategy = "+"
+            self.cutoff = cutoff_strat1
+        elif strat == "strat2":
+            best_strategy = "++"
+            self.strategy = "++"
+            self.cutoff = cutoff_strat2
+        elif strat == "strat3":
+            best_strategy = "+-"
+            self.strategy = "+-"
+            self.cutoff = cutoff_strat3
+        elif strat == "strat4":
+            best_strategy = "+--"
+            self.strategy = "++--"
+            self.cutoff = cutoff_strat4
+        # this should never happen
+        else:
+            warnings.warn("Strategy key not detected! This should not happen!", UserWarning)
         # evaluation
         self.train_results = {"TRAIN":
                                 {
@@ -224,23 +258,39 @@ class PIAModel:
                               "++--": PIAScore.get_metrics(test_result_strat4, cutoff_strat4)
                               }
                             }
-
-        # set optimal cutoff and strategy
-        if strat == "strat1":
-            self.strategy = "+"
-            self.cutoff = cutoff_strat1
-        elif strat == "strat2":
-            self.strategy = "++"
-            self.cutoff = cutoff_strat2
-        elif strat == "strat3":
-            self.strategy = "+-"
-            self.cutoff = cutoff_strat3
-        elif strat == "strat4":
-            self.strategy = "++--"
-            self.cutoff = cutoff_strat4
-        # this should never happen
-        else:
-            warnings.warn("Strategy key not detected! This should not happen!", UserWarning)
+        self.statistics = {"STRAT":
+                            {
+                            "best_strategy": best_strategy,
+                            "cutoffs":
+                                {
+                                "+": cutoff_strat1,
+                                "++": cutoff_strat2,
+                                "+-": cutoff_strat3,
+                                "++--": cutoff_strat4
+                                }
+                            },
+                           "TRAIN":
+                            {
+                            "+": PIAScore.get_metrics(train_result_strat1, cutoff_strat1, pretty_print = True),
+                            "++": PIAScore.get_metrics(train_result_strat2, cutoff_strat2, pretty_print = True),
+                            "+-": PIAScore.get_metrics(train_result_strat3, cutoff_strat3, pretty_print = True),
+                            "++--": PIAScore.get_metrics(train_result_strat4, cutoff_strat4, pretty_print = True)
+                            },
+                           "VAL":
+                            {
+                            "+": PIAScore.get_metrics(val_result_strat1, cutoff_strat1, pretty_print = True),
+                            "++": PIAScore.get_metrics(val_result_strat2, cutoff_strat2, pretty_print = True),
+                            "+-": PIAScore.get_metrics(val_result_strat3, cutoff_strat3, pretty_print = True),
+                            "++--": PIAScore.get_metrics(val_result_strat4, cutoff_strat4, pretty_print = True)
+                            },
+                           "TEST":
+                            {
+                            "+": PIAScore.get_metrics(test_result_strat1, cutoff_strat1, pretty_print = True),
+                            "++": PIAScore.get_metrics(test_result_strat2, cutoff_strat2, pretty_print = True),
+                            "+-": PIAScore.get_metrics(test_result_strat3, cutoff_strat3, pretty_print = True),
+                            "++--": PIAScore.get_metrics(test_result_strat4, cutoff_strat4, pretty_print = True)
+                            }
+                           }
 
         # cleanup
         shutil.rmtree("piamodel_structures_tmp")
@@ -263,98 +313,141 @@ class PIAModel:
         -- DESCRIPTION --
         """
 
-        if self.train_results is not None:
-            print("----- TRAINING DATA SUMMARY -----")
+        if self.statistics is not None:
+            print("#############################################")
+            print("#############################################")
+            print("---------------- STRATEGIES -----------------")
+            print("Best Strategy: ", self.statistics["STRAT"]["best_strategy"])
+            print("Cutoff Strategy +: ", self.statistics["STRAT"]["cutoffs"]["+"])
+            print("Cutoff Strategy ++: ", self.statistics["STRAT"]["cutoffs"]["++"])
+            print("Cutoff Strategy +-: ", self.statistics["STRAT"]["cutoffs"]["+-"])
+            print("Cutoff Strategy ++--: ", self.statistics["STRAT"]["cutoffs"]["++--"])
+            print("#############################################")
+            print("----------- TRAINING DATA SUMMARY -----------")
+            print("#############################################")
             print("STRATEGY +:")
-            print("    ACC: ", self.train_results["TRAIN"]["+"]["ACC"])
-            print("    FPR: ", self.train_results["TRAIN"]["+"]["FPR"])
-            print("    AUC: ", self.train_results["TRAIN"]["+"]["AUC"])
-            print("    Ya: ", self.train_results["TRAIN"]["+"]["Ya"])
-            print("    EF: ", self.train_results["TRAIN"]["+"]["EF"])
-            print("    REF: ", self.train_results["TRAIN"]["+"]["REF"])
+            print("    ACC: ", self.statistics["TRAIN"]["+"]["ACC"])
+            print("    FPR: ", self.statistics["TRAIN"]["+"]["FPR"])
+            print("    AUC: ", self.statistics["TRAIN"]["+"]["AUC"])
+            print("    Ya: ", self.statistics["TRAIN"]["+"]["Ya"])
+            print("    EF: ", self.statistics["TRAIN"]["+"]["EF"])
+            print("    REF: ", self.statistics["TRAIN"]["+"]["REF"])
             print("STRATEGY ++:")
-            print("    ACC: ", self.train_results["TRAIN"]["++"]["ACC"])
-            print("    FPR: ", self.train_results["TRAIN"]["++"]["FPR"])
-            print("    AUC: ", self.train_results["TRAIN"]["++"]["AUC"])
-            print("    Ya: ", self.train_results["TRAIN"]["++"]["Ya"])
-            print("    EF: ", self.train_results["TRAIN"]["++"]["EF"])
-            print("    REF: ", self.train_results["TRAIN"]["++"]["REF"])
+            print("    ACC: ", self.statistics["TRAIN"]["++"]["ACC"])
+            print("    FPR: ", self.statistics["TRAIN"]["++"]["FPR"])
+            print("    AUC: ", self.statistics["TRAIN"]["++"]["AUC"])
+            print("    Ya: ", self.statistics["TRAIN"]["++"]["Ya"])
+            print("    EF: ", self.statistics["TRAIN"]["++"]["EF"])
+            print("    REF: ", self.statistics["TRAIN"]["++"]["REF"])
             print("STRATEGY +-:")
-            print("    ACC: ", self.train_results["TRAIN"]["+-"]["ACC"])
-            print("    FPR: ", self.train_results["TRAIN"]["+-"]["FPR"])
-            print("    AUC: ", self.train_results["TRAIN"]["+-"]["AUC"])
-            print("    Ya: ", self.train_results["TRAIN"]["+-"]["Ya"])
-            print("    EF: ", self.train_results["TRAIN"]["+-"]["EF"])
-            print("    REF: ", self.train_results["TRAIN"]["+-"]["REF"])
+            print("    ACC: ", self.statistics["TRAIN"]["+-"]["ACC"])
+            print("    FPR: ", self.statistics["TRAIN"]["+-"]["FPR"])
+            print("    AUC: ", self.statistics["TRAIN"]["+-"]["AUC"])
+            print("    Ya: ", self.statistics["TRAIN"]["+-"]["Ya"])
+            print("    EF: ", self.statistics["TRAIN"]["+-"]["EF"])
+            print("    REF: ", self.statistics["TRAIN"]["+-"]["REF"])
             print("STRATEGY ++--:")
-            print("    ACC: ", self.train_results["TRAIN"]["++--"]["ACC"])
-            print("    FPR: ", self.train_results["TRAIN"]["++--"]["FPR"])
-            print("    AUC: ", self.train_results["TRAIN"]["++--"]["AUC"])
-            print("    Ya: ", self.train_results["TRAIN"]["++--"]["Ya"])
-            print("    EF: ", self.train_results["TRAIN"]["++--"]["EF"])
-            print("    REF: ", self.train_results["TRAIN"]["++--"]["REF"])
-            print("----- VALIDATION DATA SUMMARY -----")
+            print("    ACC: ", self.statistics["TRAIN"]["++--"]["ACC"])
+            print("    FPR: ", self.statistics["TRAIN"]["++--"]["FPR"])
+            print("    AUC: ", self.statistics["TRAIN"]["++--"]["AUC"])
+            print("    Ya: ", self.statistics["TRAIN"]["++--"]["Ya"])
+            print("    EF: ", self.statistics["TRAIN"]["++--"]["EF"])
+            print("    REF: ", self.statistics["TRAIN"]["++--"]["REF"])
+            print("#############################################")
+            print("---------- VALIDATION DATA SUMMARY ----------")
+            print("#############################################")
             print("STRATEGY +:")
-            print("    ACC: ", self.train_results["VAL"]["+"]["ACC"])
-            print("    FPR: ", self.train_results["VAL"]["+"]["FPR"])
-            print("    AUC: ", self.train_results["VAL"]["+"]["AUC"])
-            print("    Ya: ", self.train_results["VAL"]["+"]["Ya"])
-            print("    EF: ", self.train_results["VAL"]["+"]["EF"])
-            print("    REF: ", self.train_results["VAL"]["+"]["REF"])
+            print("    ACC: ", self.statistics["VAL"]["+"]["ACC"])
+            print("    FPR: ", self.statistics["VAL"]["+"]["FPR"])
+            print("    AUC: ", self.statistics["VAL"]["+"]["AUC"])
+            print("    Ya: ", self.statistics["VAL"]["+"]["Ya"])
+            print("    EF: ", self.statistics["VAL"]["+"]["EF"])
+            print("    REF: ", self.statistics["VAL"]["+"]["REF"])
             print("STRATEGY ++:")
-            print("    ACC: ", self.train_results["VAL"]["++"]["ACC"])
-            print("    FPR: ", self.train_results["VAL"]["++"]["FPR"])
-            print("    AUC: ", self.train_results["VAL"]["++"]["AUC"])
-            print("    Ya: ", self.train_results["VAL"]["++"]["Ya"])
-            print("    EF: ", self.train_results["VAL"]["++"]["EF"])
-            print("    REF: ", self.train_results["VAL"]["++"]["REF"])
+            print("    ACC: ", self.statistics["VAL"]["++"]["ACC"])
+            print("    FPR: ", self.statistics["VAL"]["++"]["FPR"])
+            print("    AUC: ", self.statistics["VAL"]["++"]["AUC"])
+            print("    Ya: ", self.statistics["VAL"]["++"]["Ya"])
+            print("    EF: ", self.statistics["VAL"]["++"]["EF"])
+            print("    REF: ", self.statistics["VAL"]["++"]["REF"])
             print("STRATEGY +-:")
-            print("    ACC: ", self.train_results["VAL"]["+-"]["ACC"])
-            print("    FPR: ", self.train_results["VAL"]["+-"]["FPR"])
-            print("    AUC: ", self.train_results["VAL"]["+-"]["AUC"])
-            print("    Ya: ", self.train_results["VAL"]["+-"]["Ya"])
-            print("    EF: ", self.train_results["VAL"]["+-"]["EF"])
-            print("    REF: ", self.train_results["VAL"]["+-"]["REF"])
+            print("    ACC: ", self.statistics["VAL"]["+-"]["ACC"])
+            print("    FPR: ", self.statistics["VAL"]["+-"]["FPR"])
+            print("    AUC: ", self.statistics["VAL"]["+-"]["AUC"])
+            print("    Ya: ", self.statistics["VAL"]["+-"]["Ya"])
+            print("    EF: ", self.statistics["VAL"]["+-"]["EF"])
+            print("    REF: ", self.statistics["VAL"]["+-"]["REF"])
             print("STRATEGY ++--:")
-            print("    ACC: ", self.train_results["VAL"]["++--"]["ACC"])
-            print("    FPR: ", self.train_results["VAL"]["++--"]["FPR"])
-            print("    AUC: ", self.train_results["VAL"]["++--"]["AUC"])
-            print("    Ya: ", self.train_results["VAL"]["++--"]["Ya"])
-            print("    EF: ", self.train_results["VAL"]["++--"]["EF"])
-            print("    REF: ", self.train_results["VAL"]["++--"]["REF"])
-            print("----- TEST DATA SUMMARY -----")
+            print("    ACC: ", self.statistics["VAL"]["++--"]["ACC"])
+            print("    FPR: ", self.statistics["VAL"]["++--"]["FPR"])
+            print("    AUC: ", self.statistics["VAL"]["++--"]["AUC"])
+            print("    Ya: ", self.statistics["VAL"]["++--"]["Ya"])
+            print("    EF: ", self.statistics["VAL"]["++--"]["EF"])
+            print("    REF: ", self.statistics["VAL"]["++--"]["REF"])
+            print("#############################################")
+            print("------------- TEST DATA SUMMARY -------------")
+            print("#############################################")
             print("STRATEGY +:")
-            print("    ACC: ", self.train_results["TEST"]["+"]["ACC"])
-            print("    FPR: ", self.train_results["TEST"]["+"]["FPR"])
-            print("    AUC: ", self.train_results["TEST"]["+"]["AUC"])
-            print("    Ya: ", self.train_results["TEST"]["+"]["Ya"])
-            print("    EF: ", self.train_results["TEST"]["+"]["EF"])
-            print("    REF: ", self.train_results["TEST"]["+"]["REF"])
+            print("    ACC: ", self.statistics["TEST"]["+"]["ACC"])
+            print("    FPR: ", self.statistics["TEST"]["+"]["FPR"])
+            print("    AUC: ", self.statistics["TEST"]["+"]["AUC"])
+            print("    Ya: ", self.statistics["TEST"]["+"]["Ya"])
+            print("    EF: ", self.statistics["TEST"]["+"]["EF"])
+            print("    REF: ", self.statistics["TEST"]["+"]["REF"])
             print("STRATEGY ++:")
-            print("    ACC: ", self.train_results["TEST"]["++"]["ACC"])
-            print("    FPR: ", self.train_results["TEST"]["++"]["FPR"])
-            print("    AUC: ", self.train_results["TEST"]["++"]["AUC"])
-            print("    Ya: ", self.train_results["TEST"]["++"]["Ya"])
-            print("    EF: ", self.train_results["TEST"]["++"]["EF"])
-            print("    REF: ", self.train_results["TEST"]["++"]["REF"])
+            print("    ACC: ", self.statistics["TEST"]["++"]["ACC"])
+            print("    FPR: ", self.statistics["TEST"]["++"]["FPR"])
+            print("    AUC: ", self.statistics["TEST"]["++"]["AUC"])
+            print("    Ya: ", self.statistics["TEST"]["++"]["Ya"])
+            print("    EF: ", self.statistics["TEST"]["++"]["EF"])
+            print("    REF: ", self.statistics["TEST"]["++"]["REF"])
             print("STRATEGY +-:")
-            print("    ACC: ", self.train_results["TEST"]["+-"]["ACC"])
-            print("    FPR: ", self.train_results["TEST"]["+-"]["FPR"])
-            print("    AUC: ", self.train_results["TEST"]["+-"]["AUC"])
-            print("    Ya: ", self.train_results["TEST"]["+-"]["Ya"])
-            print("    EF: ", self.train_results["TEST"]["+-"]["EF"])
-            print("    REF: ", self.train_results["TEST"]["+-"]["REF"])
+            print("    ACC: ", self.statistics["TEST"]["+-"]["ACC"])
+            print("    FPR: ", self.statistics["TEST"]["+-"]["FPR"])
+            print("    AUC: ", self.statistics["TEST"]["+-"]["AUC"])
+            print("    Ya: ", self.statistics["TEST"]["+-"]["Ya"])
+            print("    EF: ", self.statistics["TEST"]["+-"]["EF"])
+            print("    REF: ", self.statistics["TEST"]["+-"]["REF"])
             print("STRATEGY ++--:")
-            print("    ACC: ", self.train_results["TEST"]["++--"]["ACC"])
-            print("    FPR: ", self.train_results["TEST"]["++--"]["FPR"])
-            print("    AUC: ", self.train_results["TEST"]["++--"]["AUC"])
-            print("    Ya: ", self.train_results["TEST"]["++--"]["Ya"])
-            print("    EF: ", self.train_results["TEST"]["++--"]["EF"])
-            print("    REF: ", self.train_results["TEST"]["++--"]["REF"])
+            print("    ACC: ", self.statistics["TEST"]["++--"]["ACC"])
+            print("    FPR: ", self.statistics["TEST"]["++--"]["FPR"])
+            print("    AUC: ", self.statistics["TEST"]["++--"]["AUC"])
+            print("    Ya: ", self.statistics["TEST"]["++--"]["Ya"])
+            print("    EF: ", self.statistics["TEST"]["++--"]["EF"])
+            print("    REF: ", self.statistics["TEST"]["++--"]["REF"])
+            print("#############################################")
         else:
             print("No model statistics are available!")
 
         return
+
+    # change scoring strategy
+    def change_strategy(self,
+                        strategy = "best"):
+
+        """
+        -- DESCRIPTION --
+        """
+
+        if strategy == "best":
+            self.strategy = self.statistics["STRAT"]["best_strategy"]
+            self.cutoff = int(self.statistics["STRAT"]["cutoffs"][self.strategy])
+        elif strategy == "+":
+            self.strategy = "+"
+            self.cutoff = int(self.statistics["STRAT"]["cutoffs"][self.strategy])
+        elif strategy == "++":
+            self.strategy = "++"
+            self.cutoff = int(self.statistics["STRAT"]["cutoffs"][self.strategy])
+        elif strategy == "+-":
+            self.strategy = "+-"
+            self.cutoff = int(self.statistics["STRAT"]["cutoffs"][self.strategy])
+        elif strategy == "++--":
+            self.strategy = "++--"
+            self.cutoff = int(self.statistics["STRAT"]["cutoffs"][self.strategy])
+        else:
+            pass
+
+        return [self.strategy, self.cutoff]
 
     # save model to file
     def save(self,
@@ -369,7 +462,7 @@ class PIAModel:
                  "negatives": self.negatives,
                  "strategy": self.strategy,
                  "cutoff": self.cutoff,
-                 "results": self.train_results}
+                 "statistics": self.statistics}
 
         # save in json format
         piam_file = filename + ".piam"
@@ -387,6 +480,9 @@ class PIAModel:
         """
         -- DESCRIPTION --
         """
+
+        # set PIA params
+        exclude = ["LIG", "HOH"]
 
         # characterize complex
         mol = PDBComplex()
@@ -447,26 +543,26 @@ class PIAModel:
         score = 0
         # strategy 1
         if self.strategy == "+":
-            for interaction in positives:
+            for interaction in self.positives:
                 if interaction in all_interactions:
                     score = score + 1
         # strategy 2
         elif self.strategy == "++":
-            for interaction in positives:
+            for interaction in self.positives:
                 score = score + all_interactions.count(interaction)
         # strategy 3
         elif self.strategy == "+-":
-            for interaction in positives:
+            for interaction in self.positives:
                 if interaction in all_interactions:
                     score = score + 1
-            for interaction in negatives:
-                if if interaction in all_interactions:
+            for interaction in self.negatives:
+                if interaction in all_interactions:
                     score = score - 1
         # strategy 4
         elif self.strategy == "++--":
-            for interaction in positives:
+            for interaction in self.positives:
                 score = score + all_interactions.count(interaction)
-            for interaction in negatives:
+            for interaction in self.negatives:
                 score = score - all_interactions.count(interaction)
         else:
             pass
@@ -483,7 +579,9 @@ class PIAModel:
     # predict multiple ligands from a sdf file
     def predict_sdf(self,
                     pdb_base_structure,
-                    sdf_file):
+                    sdf_file,
+                    save_csv = False,
+                    verbose = 1):
 
         """
         -- DESCRIPTION --
@@ -515,11 +613,18 @@ class PIAModel:
             result = self.predict_pdb(structure)
             names.append(ligand_names[i])
             scores.append(result["score"])
-            prediction.append(result["prediction"])
+            predictions.append(result["prediction"])
+            if verbose:
+                print("Analyzed structure ", i + 1, "!")
 
         # cleanup
         shutil.rmtree("piamodel_structures_tmp")
         os.remove(pdb_base_structure + "_cleaned.pdb")
+
+        # save csv
+        if save_csv:
+            csv = pd.DataFrame({"NAME": names, "SCORE": scores, "PREDICTION": predictions})
+            csv.to_csv(sdf_file + ".csv")
 
         # return ligand names, scores and predictions
         return {"names": names, "scores": scores, "predictions": predictions}

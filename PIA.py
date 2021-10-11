@@ -13,9 +13,11 @@ DESCRIPTION
 PIA - short for Protein Interaction Analyzer - is set of scripts and workflows
 written in python to extract interactions from multiple protein-ligand complexes
 and calculate their frequencies. In combination with PIAScore this information
-can be used for interaction-frequency-based scoring. For more information on how
-to apply PIA please refer to the thesis about this work in /docs and the
-exemplary workflows in /workflows.
+can be used for interaction-frequency-based scoring. PIA was developed as part
+of the master thesis "Automatic identification of important interactions and
+interaction-frequency-based scoring in protein-ligand complexes" and more
+background information can be found in the corresponding github repository at
+https://github.com/michabirklbauer/protein_docking
 """
 
 import json

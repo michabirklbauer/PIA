@@ -32,12 +32,16 @@ from plip.structure.preparation import PDBComplex
 class PIAModel:
     """
     -- DESCRIPTION --
+    Model class that facilitates creating, training, changing, saving and
+    loading of a scoring model.
     """
 
+    # mandatory attributes, either set via constructor or trained
     positives = None
     negatives = None
     strategy = None
     cutoff = None
+    # model statistics (optional, available if loaded from file or trained)
     statistics = None
 
     # trainable attributes (optional)
@@ -56,6 +60,73 @@ class PIAModel:
 
         """
         -- DESCRIPTION --
+        Constructor for creating a scoring model. A model can either be created
+        by:
+          (i)   specifying the PARAMS "positives", "negatives", "strategy" and
+                "cutoff", if strategy is "+" or "++" -> "negatives" doesn't need
+                to be specified
+          (ii)  specifying the PARAM "filename" in which case the model will be
+                loaded from file
+          (iii) calling an empty constructor and run PIAModel.train() method
+                afterwards
+        Depending on the choice of model creation (initializing, loading,
+        training) not all ATTRIBUTES may be available from the get-go.
+          PARAMS:
+            - positives (list of strings):
+                list of interactions with positive impact on the score,
+                interactions have to be in the format of Hydrogen_Bond:ASP351A
+                for example. Therefore it's "interactions type: residue position
+                chain" without spaces and residue and chain in upper case. This
+                PARAM has to be specified if the model is not loaded from file
+                or trained.
+            - negatives (list of strings):
+                list of interactions with negative impact on the score, in the
+                same format as for PARAM "positives". "negatives" has to be
+                specified if PARAM "strategy" is not "+" or "++", not loaded
+                from file or trained.
+            - strategy (string): one of "+", "++", "+-", "++--".
+                scoring strategy to be applied, has to be specifed unless model
+                is loaded from file or trained
+            - cutoff (int):
+                cutoff applied to predict if a complex is active (score equal or
+                above cutoff) or inactive (below cutoff), has to be specified
+                unless model is loaded from file or trained
+            - filename (string):
+                a valid path/filename to PIAModel file, only has to be specified
+                if the model should be loaded from the file
+          RETURNS:
+            None
+          ATTRIBUTES:
+            - positives (list of strings):
+                see PARAMS, available immediately in (i), (ii) or after training
+                (iii)
+            - negatives (list of strings):
+                see PARAMS, available immediately in (i), (ii) or after training
+                (iii)
+            - strategy (string):
+                see PARAMS, available immediately in (i), (ii) or after training
+                (iii)
+            - cutoff (int):
+                see PARAMS, available immediately in (i), (ii) or after training
+                (iii)
+            - statistics (dict of dicts):
+                quality metrics and parameters from training that are available
+                immediately if model was loaded from file (ii) or after training
+                (iii)
+                  -> see line 368 for complete structure of the dictionary
+            - train_results (dict of dicts):
+                additional quality metrics from training that are only available
+                if the model was trained (iii)
+                  -> see line 346 for complete structure of the dictionary
+            - plot_train (matplotlib.pyplot.figure object):
+                plot of interaction frequencies of actives and inactives in the
+                training partition, only available if model was trained (iii)
+            - plot_val (matplotlib.pyplot.figure object):
+                plot of interaction frequencies of actives and inactives in the
+                validation partition, only available if model was trained (iii)
+            - plot_test (matplotlib.pyplot.figure object):
+                plot of interaction frequencies of actives and inactives in the
+                test partition, only available if model was trained (iii)
         """
 
         # read values from file if specified
@@ -86,6 +157,43 @@ class PIAModel:
 
         """
         -- DESCRIPTION --
+        Train a model from one (or two) SDF files and a PDB base structure.
+          PARAMS:
+            - pdb_base_structure (string):
+                path/filename of the host PDB file that was used for docking of
+                the ligands. Can be complexed with a ligand since it will be
+                cleaned before processing anyway
+            - sdf_file_1 (string):
+                path/filename of the SDF file containing ligands coordiantes,
+                ligand names should contain "inactive" or "decoy" in their name
+                if to classify them as inactive, active ligands MUST NOT contain
+                these terms
+            - sdf_file_2 (string):
+                optional path/filename to a second SDF file containing ligands
+                coordiantes, ligand names should contain "inactive" or "decoy"
+                in their name if to classify them as inactive, active ligands
+                MUST NOT contain these terms
+                DEFAULT: None
+            - plot_prefix (string):
+                optional path/filename prefix for plots if they should be saved,
+                if None is supplied the plots will not be saved
+                DEFAULT: None
+            - keep_files (bool):
+                if temporary files that are created during training should be
+                kept after the training is finished or not
+                DEFAULT: False (files are not kept)
+            - block (bool):
+                if matplotlib should wait for closing all plot windows before
+                continuing or return immediately
+                DEFAULT: False (matplotlib returns immediately and plots will be
+                         be generated when the training process is finished)
+            - verbose (bool/0 or 1):
+                print additional training infos to std ouput
+                DEFAULT: 1 (information will be printed to std output)
+          RETURNS:
+            - train_results (dict of dicts):
+                quality metrics from training
+                  -> see line 346 for complete structure of the dictionary
         """
 
         # create necessary directories
@@ -310,6 +418,12 @@ class PIAModel:
 
         """
         -- DESCRIPTION --
+        Print a summary of parameters and quality metrics of the model. Only
+        available if model was loaded from file (ii) or trained (iii).
+          PARAMS:
+            None
+          RETURNS:
+            None
         """
 
         if self.statistics is not None:
@@ -426,25 +540,36 @@ class PIAModel:
 
         """
         -- DESCRIPTION --
+        Change the scoring strategy and cutoff. This method is only available
+        if the model was loaded from file (ii) or trained (iii).
+          PARAMS:
+            - strategy (string): one of "best", "+", "++", "+-", "++--".
+                scoring strategy to be applied, "best" refers to the best-on-
+                validation strategy
+                DEFAULT: "best"
+          RETURNS:
+            - list of changed strategy (string, index 0) and changed
+              cutoff (int, index 1)
         """
 
-        if strategy == "best":
-            self.strategy = self.statistics["STRAT"]["best_strategy"]
-            self.cutoff = int(self.statistics["STRAT"]["cutoffs"][self.strategy])
-        elif strategy == "+":
-            self.strategy = "+"
-            self.cutoff = int(self.statistics["STRAT"]["cutoffs"][self.strategy])
-        elif strategy == "++":
-            self.strategy = "++"
-            self.cutoff = int(self.statistics["STRAT"]["cutoffs"][self.strategy])
-        elif strategy == "+-":
-            self.strategy = "+-"
-            self.cutoff = int(self.statistics["STRAT"]["cutoffs"][self.strategy])
-        elif strategy == "++--":
-            self.strategy = "++--"
-            self.cutoff = int(self.statistics["STRAT"]["cutoffs"][self.strategy])
-        else:
-            pass
+        if self.statistics is not None:
+            if strategy == "best":
+                self.strategy = self.statistics["STRAT"]["best_strategy"]
+                self.cutoff = int(self.statistics["STRAT"]["cutoffs"][self.strategy])
+            elif strategy == "+":
+                self.strategy = "+"
+                self.cutoff = int(self.statistics["STRAT"]["cutoffs"][self.strategy])
+            elif strategy == "++":
+                self.strategy = "++"
+                self.cutoff = int(self.statistics["STRAT"]["cutoffs"][self.strategy])
+            elif strategy == "+-":
+                self.strategy = "+-"
+                self.cutoff = int(self.statistics["STRAT"]["cutoffs"][self.strategy])
+            elif strategy == "++--":
+                self.strategy = "++--"
+                self.cutoff = int(self.statistics["STRAT"]["cutoffs"][self.strategy])
+            else:
+                pass
 
         return [self.strategy, self.cutoff]
 
@@ -454,6 +579,11 @@ class PIAModel:
 
         """
         -- DESCRIPTION --
+        Save model configuration to file.
+          PARAMS:
+            - filename (string): path/filename where the model should be saved
+          RETURNS:
+            - path/filename (string) of the created file
         """
 
         # define model as dict
@@ -478,6 +608,13 @@ class PIAModel:
 
         """
         -- DESCRIPTION --
+        Score/Predict a single protein-ligand complex in PDB format.
+          PARAMS:
+            - pdb_file (string): path/filename of the complex in PDB format
+          RETURNS:
+            - dict with keys "name" (string, filename of the complex), "score"
+              (int, the score of the complex) and "prediction" (string, "active"
+              or "inactive", the prediction of the complex)
         """
 
         # set PIA params
@@ -584,6 +721,30 @@ class PIAModel:
 
         """
         -- DESCRIPTION --
+        Predict multiple protein-ligand complexes from a host PDB file and
+        ligands in SDF format.
+          PARAMS:
+            - pdb_base_structure (string):
+              path/filename of the host PDB file that was used for docking of
+              the ligands. Can be complexed with a ligand since it will be
+              cleaned before processing anyway
+            - sdf_file (string):
+              path/filename of the SDF file with ligand coordinates
+            - save_csv (bool):
+              if results should be saved as csv files, csv files are created in
+              the current working directory with filename of the SDF file +
+              ".csv"
+              DEFAULT: False (results are not saved)
+            - verbose (bool/0 or 1):
+              should additional info be printed during the prediction process
+              DEFAULT: 1 (information will be printed to std output)
+          RETURNS:
+            - dict of lists with keys "names" (list of strings, ligand names of
+              the complexes), "scores" (list of ints, the scores of the
+              complexes) and "predictions" (list of strings, "active" or
+              "inactive", the predictions of the complexs) where
+              dict["names"][i] corresponds to dict["scores"][i] and
+              dict["predictions"][i]
         """
 
         # init return values

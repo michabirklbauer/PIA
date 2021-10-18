@@ -381,7 +381,7 @@ def main():
         pass
     elif args.mode == "predict":
         pass
-    else
+    else:
         pass
 
 if __name__ == '__main__':

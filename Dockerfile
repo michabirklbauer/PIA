@@ -1,4 +1,4 @@
-# Dockerfile with the PIA scripts
+# Dockerfile with the PIA package installed and PIAScript
 # author: Micha Birklbauer
 # version: 1.0.0
 
@@ -8,6 +8,7 @@ LABEL maintainer="micha.birklbauer@gmail.com"
 
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && apt-get install -y \
+    git \
     libopenbabel-dev \
     libopenbabel6 \
     openbabel \
@@ -28,12 +29,15 @@ RUN pip3 install matplotlib
 RUN pip3 install streamlit
 RUN pip3 install jupyterlab
 
-RUN mkdir PIA
-RUN mkdir exchange
+RUN git clone https://github.com/michabirklbauer/pia.git
+RUN cd pia
+RUN python3 setup.py install
+RUN cd ..
 
-COPY PIA.py PIA
-COPY PIAScore.py PIA
-COPY PIAModel.py PIA
+RUN mkdir exchange
+RUN mkdir PIA
+
 COPY PIAScript.py PIA
+COPY PIAScript.py /bin
 
 CMD  ["/bin/bash"]

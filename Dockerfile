@@ -30,9 +30,9 @@ RUN pip3 install streamlit
 RUN pip3 install jupyterlab
 
 RUN git clone https://github.com/michabirklbauer/pia.git
-RUN cd pia
+WORKDIR pia
 RUN python3 setup.py install
-RUN cd ..
+WORKDIR /
 
 RUN mkdir exchange
 RUN mkdir PIA

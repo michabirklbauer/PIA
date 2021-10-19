@@ -32,11 +32,11 @@ import shutil
 import argparse
 import urllib.request as ur
 from datetime import datetime
-from PIAScore import *
-from PIA import PIA as PIA
-from PIA import Preparation as Preparation
-from PIA import Comparison as Comparison
-from PIAModel import PIAModel as PIAModel
+from PIA.PIAScore import *
+from PIA.PIA import PIA as PIA
+from PIA.PIA import Preparation as Preparation
+from PIA.PIA import Comparison as Comparison
+from PIA.PIAModel import PIAModel as PIAModel
 
 # helper functions
 
@@ -106,7 +106,7 @@ def extract_codes(list_of_codes):
     -- DESCRIPTION --
     """
 
-    filenames = [i + ".pdb" if i.split(".")[-1] != "pdb" else i for i in codes]
+    filenames = [i + ".pdb" if i.split(".")[-1] != "pdb" else i for i in list_of_codes]
     download_links = ["https://files.rcsb.org/download/" + i for i in filenames]
 
     for i, link in enumerate(download_links):
@@ -374,28 +374,60 @@ def main():
 
     if args.mode == "extract":
         if files_dict["sdf1"] is not None:
-            r = extract_sdf(files_dict["pdb"], files_dict["sdf1"])
-        else:
-            pdb_codes = txt_to_list(files_dict["txt"])
-            if os.path.isfile(pdb_codes[0]):
-                r = extract_pdbs(pdb_codes)
+            if files_dict["pdb"] is not None:
+                r = extract_sdf(files_dict["pdb"], files_dict["sdf1"])
             else:
-                r = extract_codes(pdb_codes)
+                print("ERROR: PDB file is required but none was provided. Exiting!")
+                r = 1
+        else:
+            if files_dict["txt"] is not None:
+                pdb_codes = txt_to_list(files_dict["txt"])
+                files_exist = True
+                for code in pdb_codes:
+                    if not os.path.isfile(pdb_codes[0]):
+                        files_exist = False
+                if files_exist:
+                    r = extract_pdbs(pdb_codes)
+                else:
+                    r = extract_codes(pdb_codes)
+            else:
+                print("ERROR: TXT file of PDB codes or structures is required but none was provided. Exiting!")
+                r = 1
     elif args.mode == "compare":
-        r = compare(files_dict["pdb"], files_dict["sdf1"], files_dict["sdf2"])
-    elif args.mode == "score":
-        r = score(files_dict["pdb"], files_dict["sdf1"], files_dict["sdf2"])
-    elif args.mode == "predict":
-        if files_dict["sdf1"] is not None:
-            if files_dict["piam"] is not None:
-                r = predict_sdf(files_dict["piam"], files_dict["pdb"], files_dict["sdf1"])
-            else:
-                r = predict_sdf(txt_to_list(files_dict["txt"]), files_dict["pdb"], files_dict["sdf1"], cutoff = args.cutoff)
+        if files_dict["pdb"] is not None and files_dict["sdf1"] is not None and files_dict["sdf2"] is not None:
+            r = compare(files_dict["pdb"], files_dict["sdf1"], files_dict["sdf2"])
         else:
-            if files_dict["piam"] is not None:
-                r = predict_pdb(files_dict["piam"], files_dict["pdb"])
+            print("ERROR: PDB file and SDF file are required but at least one of them was not provided. Exiting!")
+            r = 1
+    elif args.mode == "score":
+        if files_dict["pdb"] is not None and files_dict["sdf1"] is not None and files_dict["sdf2"] is not None:
+            r = score(files_dict["pdb"], files_dict["sdf1"], files_dict["sdf2"])
+        else:
+            print("ERROR: PDB file and SDF file are required but at least one of them was not provided. Exiting!")
+            r = 1
+    elif args.mode == "predict":
+        if files_dict["pdb"] is not None:
+            if files_dict["sdf1"] is not None:
+                if files_dict["piam"] is not None:
+                    r = predict_sdf(files_dict["piam"], files_dict["pdb"], files_dict["sdf1"])
+                else:
+                    if files_dict["txt"] is not None:
+                        r = predict_sdf(txt_to_list(files_dict["txt"]), files_dict["pdb"], files_dict["sdf1"], cutoff = args.cutoff)
+                    else:
+                        print("ERROR: Model file or TXT file of interactions is required but none was provided. Exiting!")
+                        r = 1
             else:
-                r = predict_pdb(txt_to_list(files_dict["txt"]), files_dict["pdb"], cutoff = args.cutoff)
+                if files_dict["piam"] is not None:
+                    r = predict_pdb(files_dict["piam"], files_dict["pdb"])
+                else:
+                    if files_dict["txt"] is not None:
+                        r = predict_pdb(txt_to_list(files_dict["txt"]), files_dict["pdb"], cutoff = args.cutoff)
+                    else:
+                        print("ERROR: Model file or TXT file of interactions is required but none was provided. Exiting!")
+                        r = 1
+        else:
+            print("ERROR: PDB file is required but none was provided. Exiting!")
+            r = 1
     else:
         r = 1
 

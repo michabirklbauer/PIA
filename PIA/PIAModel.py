@@ -21,12 +21,12 @@ import warnings
 import numpy as np
 import pandas as pd
 from itertools import islice
-import PIAScore
-from PIA import PIA
-from PIA import Preparation
-from PIA import Scoring
-from PIA import Comparison
-from PIA import exclusion_list
+from PIA import PIAScore
+from PIA.PIA import PIA
+from PIA.PIA import Preparation
+from PIA.PIA import Scoring
+from PIA.PIA import Comparison
+from PIA.PIA import exclusion_list
 from plip.structure.preparation import PDBComplex
 
 class PIAModel:

@@ -12,18 +12,14 @@ date = "20211007"
 DESCRIPTION
 PIAScript is a commandline application to apply PIA without the need of coding
 your own workflows. PIAScript supports several input modes and can be tuned by
-specifying the according arguments.
+specifying the according arguments. See README.md for a complete description and
+example usages!
 
-NOTES - TO BE DELETED!!!
-https://docs.python.org/3/library/argparse.html
-https://docs.python.org/3/howto/argparse.html
-https://www.golinuxcloud.com/python-argparse/
-
-ARGS:
+ARGUMENTS:
 -h --help: help
--m --mode: workflow mode
--f --file: files
--c --cutoff: cutoff
+-m --mode: workflow, can be any of "extract", "compare", "score" and "predict"
+-f --file: files to be processed
+-c --cutoff: cutoff, optional for if interactions are provided for scoring
 """
 
 import os
@@ -38,13 +34,14 @@ from PIA.PIA import Preparation as Preparation
 from PIA.PIA import Comparison as Comparison
 from PIA.PIAModel import PIAModel as PIAModel
 
-# helper functions
+#### -------------------------- HELPER FUNCTIONS -------------------------- ####
 
-## get elements from a comma delimited txt file
+# get elements from a comma delimited txt file
 def txt_to_list(txt_file):
 
     """
     -- DESCRIPTION --
+    Return elements as list from a comma seperated txt file.
     """
 
     with open(txt_file, "r", encoding = "utf-8") as f:
@@ -53,19 +50,23 @@ def txt_to_list(txt_file):
 
     return [i.strip() for i in data.split(",")]
 
-#
+# get file types
 def file_parser(list_of_files):
 
     """
     -- DESCRIPTION --
+    Parse a list of filenames for the file extensions. Return needed file types
+    as dictionary.
     """
 
+    # file types processed by PIAScript
     pdb = None
     sdf1 = None
     sdf2 = None
     txt = None
     piam = None
 
+    # extract file extensions
     for f in list_of_files:
         if f.split(".")[-1] == "pdb":
             if pdb == None:
@@ -97,21 +98,25 @@ def file_parser(list_of_files):
 
     return {"pdb": pdb, "sdf1": sdf1, "sdf2": sdf2, "txt": txt, "piam": piam}
 
-# extract interactions
+#### -------------------------- PIASCRIPT MODES --------------------------- ####
 
-## input mode 1: pdb codes
+# workflow extract - input mode 1: pdb codes
 def extract_codes(list_of_codes):
 
     """
     -- DESCRIPTION --
+    Download PDB entries and process them.
     """
 
+    # create list of PDB links
     filenames = [i + ".pdb" if i.split(".")[-1] != "pdb" else i for i in list_of_codes]
     download_links = ["https://files.rcsb.org/download/" + i for i in filenames]
 
+    # download files
     for i, link in enumerate(download_links):
         ur.urlretrieve(link, filenames[i])
 
+    # extract interactions and frequencies
     output_name_prefix = datetime.now().strftime("%b-%d-%Y_%H-%M-%S")
     result = PIA(filenames)
     p = result.plot("Analysis of PDB Codes", filename = output_name_prefix + "_analysis.png")
@@ -124,13 +129,15 @@ def extract_codes(list_of_codes):
 
     return result
 
-## input mode 2: pdb files
+# workflow extract - input mode 2: pdb files
 def extract_pdbs(list_of_files):
 
     """
     -- DESCRIPTION --
+    Process local PDB structures.
     """
 
+    # extract interactions and frequencies
     output_name_prefix = datetime.now().strftime("%b-%d-%Y_%H-%M-%S")
     result = PIA(list_of_files)
     p = result.plot("Analysis of PDB files", filename = output_name_prefix + "_analysis.png")
@@ -139,11 +146,12 @@ def extract_pdbs(list_of_files):
 
     return result
 
-## input mode 3: sdf file
+# workflow extract - input mode 3: sdf file
 def extract_sdf(pdb_file, sdf_file):
 
     """
     -- DESCRIPTION --
+    Process docked structures from a SDF file.
     """
 
     # create necessary directories
@@ -151,6 +159,7 @@ def extract_sdf(pdb_file, sdf_file):
     structures_path = os.path.join(os.getcwd(), structures_directory)
     os.mkdir(structures_path)
 
+    # extract interactions and frequencies
     output_name_prefix = sdf_file.split(".sdf")[0] + datetime.now().strftime("%b-%d-%Y_%H-%M-%S")
     p = Preparation()
     pdb = p.remove_ligands(pdb_file, pdb_file.split(".pdb")[0] + "_cleaned.pdb")
@@ -169,14 +178,12 @@ def extract_sdf(pdb_file, sdf_file):
 
     return result
 
-# compare interactions
-
-## input mode 1: one sdf file
-## input mode 2: two sdf files
+# workflow compare - input mode 1: one/two sdf file(s)
 def compare(pdb_file, sdf_file_1, sdf_file_2 = None):
 
     """
     -- DESCRIPTION --
+    Compare active and inactive complexes stored in a SDF file.
     """
 
     # create necessary directories
@@ -199,6 +206,7 @@ def compare(pdb_file, sdf_file_1, sdf_file_2 = None):
             f.close()
         filename = "compare_combo_tmp.sdf"
 
+    # extract interactions and frequencies
     output_name_prefix = sdf_file.split(".sdf")[0] + datetime.now().strftime("%b-%d-%Y_%H-%M-%S")
     p = Preparation()
     pdb = p.remove_ligands(pdb_file, pdb_file.split(".pdb")[0] + "_cleaned.pdb")
@@ -236,20 +244,23 @@ def compare(pdb_file, sdf_file_1, sdf_file_2 = None):
 
     return [result_1, result_2, comparison]
 
-# scoring
-
-## input mode 1: one sdf file
-## input mode 2: two sdf files
+# workflow score - input mode 1: one/two sdf file(s)
 def score(pdb_file, sdf_file_1, sdf_file_2 = None):
 
     """
     -- DESCRIPTION --
+    Train a scoring model from one or two SDF files. All results including model
+    files are saved in the current directory.
     """
 
+    # output file prefix
     output_name_prefix = sdf_file.split(".sdf")[0] + datetime.now().strftime("%b-%d-%Y_%H-%M-%S")
 
+    # train model
     model = PIAModel()
     train_results = model.train(pdb_file, sdf_file_1, sdf_file_2, plot_prefix = output_name_prefix, keep_files = True)
+
+    # save plots - ROC
     p_1 = plot_ROC_curve(train_results["TRAIN"]["+"]["ROC"]["fpr"], train_results["TRAIN"]["+"]["ROC"]["tpr"],
                          filename = output_name_prefix + "_roc_train_strat_p.png")
     p_2 = plot_ROC_curve(train_results["TRAIN"]["++"]["ROC"]["fpr"], train_results["TRAIN"]["++"]["ROC"]["tpr"],
@@ -274,6 +285,8 @@ def score(pdb_file, sdf_file_1, sdf_file_2 = None):
                          filename = output_name_prefix + "_roc_test_strat_pm.png")
     p_12 = plot_ROC_curve(train_results["TEST"]["++--"]["ROC"]["fpr"], train_results["TEST"]["++--"]["ROC"]["tpr"],
                          filename = output_name_prefix + "_roc_test_strat_ppmm.png")
+
+    # save plots - CM
     cm_1 = plot_confusion_matrix(train_results["TRAIN"]["+"]["CM"], [0, 1], filename = output_name_prefix + "_cm_train_strat_p.png")
     cm_2 = plot_confusion_matrix(train_results["TRAIN"]["++"]["CM"], [0, 1], filename = output_name_prefix + "_cm_train_strat_pp.png")
     cm_3 = plot_confusion_matrix(train_results["TRAIN"]["+-"]["CM"], [0, 1], filename = output_name_prefix + "_cm_train_strat_pm.png")
@@ -286,7 +299,11 @@ def score(pdb_file, sdf_file_1, sdf_file_2 = None):
     cm_10 = plot_confusion_matrix(train_results["TEST"]["++"]["CM"], [0, 1], filename = output_name_prefix + "_cm_test_strat_pp.png")
     cm_11 = plot_confusion_matrix(train_results["TEST"]["+-"]["CM"], [0, 1], filename = output_name_prefix + "_cm_test_strat_pm.png")
     cm_12 = plot_confusion_matrix(train_results["TEST"]["++--"]["CM"], [0, 1], filename = output_name_prefix + "_cm_test_strat_ppmm.png")
+
+    # print and save summary statistics
     model.summary(filename = output_name_prefix + "_summary.txt")
+
+    # save models
     model.save(output_name_prefix + "_best")
     model.change_strategy("+")
     model.save(output_name_prefix + "_p")
@@ -300,17 +317,15 @@ def score(pdb_file, sdf_file_1, sdf_file_2 = None):
 
     return model
 
-# prediction
-
-## model input (either model file or supply params -> actives.txt, inactives.txt)
-
-## input mode 1: pdb file
+# workflow predict - input mode 1: pdb file
 def predict_pdb(model_info, pdb_file, cutoff = None):
 
     """
     -- DESCRIPTION --
+    Predict a complex in PDB format.
     """
 
+    # check if model or interactions are given
     if isinstance(model_info, str):
         model = PIAModel(filename = model_info)
     else:
@@ -319,18 +334,21 @@ def predict_pdb(model_info, pdb_file, cutoff = None):
         else:
             model = PIAModel(positives = model_info, strategy = "+", cutoff = math.ceil(len(model_info)/2))
 
+    # get and print prediction
     prediction = model.predict_pdb(pdb_file)
     print(prediction)
 
     return prediction
 
-## input mode 2: sdf file
+# workflow predict - input mode 2: sdf file
 def predict_sdf(model_info, pdb_file, sdf_file, cutoff = None):
 
     """
     -- DESCRIPTION --
+    Predict multiple, docked protein-ligand complexes from PDB + SDF files.
     """
 
+    # check if model or interactions are given
     if isinstance(model_info, str):
         model = PIAModel(filename = model_info)
     else:
@@ -339,15 +357,20 @@ def predict_sdf(model_info, pdb_file, sdf_file, cutoff = None):
         else:
             model = PIAModel(positives = model_info, strategy = "+", cutoff = math.ceil(len(model_info)/2))
 
+    # return predicted dataset and save it as csv
     return model.predict_sdf(pdb_file, sdf_file, save_csv = True)
 
-# main function of the script
+#### -------------------------------- MAIN -------------------------------- ####
+
+# main function
 def main():
 
     """
     -- DESCRIPTION --
+    Main script checking for arguments and executing workflows.
     """
 
+    # possible arguments
     parser = argparse.ArgumentParser()
     parser.add_argument("-m", "--mode",
                         choices = ("extract", "compare", "score", "predict"),
@@ -370,8 +393,10 @@ def main():
                         )
     args = parser.parse_args()
 
+    # get supplied files
     files_dict = file_parser(args.files)
 
+    # choose appropriate workflow based on mode
     if args.mode == "extract":
         if files_dict["sdf1"] is not None:
             if files_dict["pdb"] is not None:
@@ -431,7 +456,11 @@ def main():
     else:
         r = 1
 
+    # return worklow output or 1 if something went wrong
     return r
 
+#### ------------------------------- SCRIPT ------------------------------- ####
+
+# run main function
 if __name__ == '__main__':
     r = main()

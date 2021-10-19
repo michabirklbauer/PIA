@@ -518,7 +518,7 @@ class PIAModel:
             s = s + "    Ya: " + str(self.statistics["TEST"]["++"]["Ya"]) + "\n"
             s = s + "    EF: " + str(self.statistics["TEST"]["++"]["EF"]) + "\n"
             s = s + "    REF: " + str(self.statistics["TEST"]["++"]["REF"]) + "\n"
-            s = s + "STRATEGY +-:\n")
+            s = s + "STRATEGY +-:\n"
             s = s + "    ACC: " + str(self.statistics["TEST"]["+-"]["ACC"]) + "\n"
             s = s + "    FPR: " + str(self.statistics["TEST"]["+-"]["FPR"]) + "\n"
             s = s + "    AUC: " + str(self.statistics["TEST"]["+-"]["AUC"]) + "\n"

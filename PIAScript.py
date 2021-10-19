@@ -115,6 +115,7 @@ def extract_codes(list_of_codes):
     # download files
     for i, link in enumerate(download_links):
         ur.urlretrieve(link, filenames[i])
+        print("Downloaded ", filenames[i])
 
     # extract interactions and frequencies
     output_name_prefix = datetime.now().strftime("%b-%d-%Y_%H-%M-%S")
@@ -419,13 +420,13 @@ def main():
                 print("ERROR: TXT file of PDB codes or structures is required but none was provided. Exiting!")
                 r = 1
     elif args.mode == "compare":
-        if files_dict["pdb"] is not None and files_dict["sdf1"] is not None and files_dict["sdf2"] is not None:
+        if files_dict["pdb"] is not None and files_dict["sdf1"] is not None:
             r = compare(files_dict["pdb"], files_dict["sdf1"], files_dict["sdf2"])
         else:
             print("ERROR: PDB file and SDF file are required but at least one of them was not provided. Exiting!")
             r = 1
     elif args.mode == "score":
-        if files_dict["pdb"] is not None and files_dict["sdf1"] is not None and files_dict["sdf2"] is not None:
+        if files_dict["pdb"] is not None and files_dict["sdf1"] is not None:
             r = score(files_dict["pdb"], files_dict["sdf1"], files_dict["sdf2"])
         else:
             print("ERROR: PDB file and SDF file are required but at least one of them was not provided. Exiting!")

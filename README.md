@@ -37,6 +37,14 @@ cat sEH_6hgv_results*.txt
 
 This will create scoring models, evaluation files and a summary of quality metrics in the `/exchange` and `C:/docker_share` directory.
 
+To launch [JupyterLab](https://jupyter.org/) in the container you need to run the command:
+
+```bash
+jupyter lab --ip=0.0.0.0 --port=8888 --allow-root
+```
+
+JupyterLab can then be accessed from any browser via the given link.
+
 ## Contact
 
 - Mail: [micha.birklbauer@gmail.com](mailto:micha.birklbauer@gmail.com)

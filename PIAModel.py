@@ -414,121 +414,130 @@ class PIAModel:
         return self.train_results
 
     # print a summary of metrics
-    def summary(self):
+    def summary(self,
+                filename = None):
 
         """
         -- DESCRIPTION --
         Print a summary of parameters and quality metrics of the model. Only
         available if model was loaded from file (ii) or trained (iii).
           PARAMS:
-            None
+            - filename (string): filename if/where generated summary should be
+                                 saved. If no filename is given the summary is
+                                 not saved
           RETURNS:
             None
         """
 
         if self.statistics is not None:
-            print("#############################################")
-            print("#############################################")
-            print("---------------- STRATEGIES -----------------")
-            print("Best Strategy: ", self.statistics["STRAT"]["best_strategy"])
-            print("Cutoff Strategy +: ", self.statistics["STRAT"]["cutoffs"]["+"])
-            print("Cutoff Strategy ++: ", self.statistics["STRAT"]["cutoffs"]["++"])
-            print("Cutoff Strategy +-: ", self.statistics["STRAT"]["cutoffs"]["+-"])
-            print("Cutoff Strategy ++--: ", self.statistics["STRAT"]["cutoffs"]["++--"])
-            print("#############################################")
-            print("----------- TRAINING DATA SUMMARY -----------")
-            print("#############################################")
-            print("STRATEGY +:")
-            print("    ACC: ", self.statistics["TRAIN"]["+"]["ACC"])
-            print("    FPR: ", self.statistics["TRAIN"]["+"]["FPR"])
-            print("    AUC: ", self.statistics["TRAIN"]["+"]["AUC"])
-            print("    Ya: ", self.statistics["TRAIN"]["+"]["Ya"])
-            print("    EF: ", self.statistics["TRAIN"]["+"]["EF"])
-            print("    REF: ", self.statistics["TRAIN"]["+"]["REF"])
-            print("STRATEGY ++:")
-            print("    ACC: ", self.statistics["TRAIN"]["++"]["ACC"])
-            print("    FPR: ", self.statistics["TRAIN"]["++"]["FPR"])
-            print("    AUC: ", self.statistics["TRAIN"]["++"]["AUC"])
-            print("    Ya: ", self.statistics["TRAIN"]["++"]["Ya"])
-            print("    EF: ", self.statistics["TRAIN"]["++"]["EF"])
-            print("    REF: ", self.statistics["TRAIN"]["++"]["REF"])
-            print("STRATEGY +-:")
-            print("    ACC: ", self.statistics["TRAIN"]["+-"]["ACC"])
-            print("    FPR: ", self.statistics["TRAIN"]["+-"]["FPR"])
-            print("    AUC: ", self.statistics["TRAIN"]["+-"]["AUC"])
-            print("    Ya: ", self.statistics["TRAIN"]["+-"]["Ya"])
-            print("    EF: ", self.statistics["TRAIN"]["+-"]["EF"])
-            print("    REF: ", self.statistics["TRAIN"]["+-"]["REF"])
-            print("STRATEGY ++--:")
-            print("    ACC: ", self.statistics["TRAIN"]["++--"]["ACC"])
-            print("    FPR: ", self.statistics["TRAIN"]["++--"]["FPR"])
-            print("    AUC: ", self.statistics["TRAIN"]["++--"]["AUC"])
-            print("    Ya: ", self.statistics["TRAIN"]["++--"]["Ya"])
-            print("    EF: ", self.statistics["TRAIN"]["++--"]["EF"])
-            print("    REF: ", self.statistics["TRAIN"]["++--"]["REF"])
-            print("#############################################")
-            print("---------- VALIDATION DATA SUMMARY ----------")
-            print("#############################################")
-            print("STRATEGY +:")
-            print("    ACC: ", self.statistics["VAL"]["+"]["ACC"])
-            print("    FPR: ", self.statistics["VAL"]["+"]["FPR"])
-            print("    AUC: ", self.statistics["VAL"]["+"]["AUC"])
-            print("    Ya: ", self.statistics["VAL"]["+"]["Ya"])
-            print("    EF: ", self.statistics["VAL"]["+"]["EF"])
-            print("    REF: ", self.statistics["VAL"]["+"]["REF"])
-            print("STRATEGY ++:")
-            print("    ACC: ", self.statistics["VAL"]["++"]["ACC"])
-            print("    FPR: ", self.statistics["VAL"]["++"]["FPR"])
-            print("    AUC: ", self.statistics["VAL"]["++"]["AUC"])
-            print("    Ya: ", self.statistics["VAL"]["++"]["Ya"])
-            print("    EF: ", self.statistics["VAL"]["++"]["EF"])
-            print("    REF: ", self.statistics["VAL"]["++"]["REF"])
-            print("STRATEGY +-:")
-            print("    ACC: ", self.statistics["VAL"]["+-"]["ACC"])
-            print("    FPR: ", self.statistics["VAL"]["+-"]["FPR"])
-            print("    AUC: ", self.statistics["VAL"]["+-"]["AUC"])
-            print("    Ya: ", self.statistics["VAL"]["+-"]["Ya"])
-            print("    EF: ", self.statistics["VAL"]["+-"]["EF"])
-            print("    REF: ", self.statistics["VAL"]["+-"]["REF"])
-            print("STRATEGY ++--:")
-            print("    ACC: ", self.statistics["VAL"]["++--"]["ACC"])
-            print("    FPR: ", self.statistics["VAL"]["++--"]["FPR"])
-            print("    AUC: ", self.statistics["VAL"]["++--"]["AUC"])
-            print("    Ya: ", self.statistics["VAL"]["++--"]["Ya"])
-            print("    EF: ", self.statistics["VAL"]["++--"]["EF"])
-            print("    REF: ", self.statistics["VAL"]["++--"]["REF"])
-            print("#############################################")
-            print("------------- TEST DATA SUMMARY -------------")
-            print("#############################################")
-            print("STRATEGY +:")
-            print("    ACC: ", self.statistics["TEST"]["+"]["ACC"])
-            print("    FPR: ", self.statistics["TEST"]["+"]["FPR"])
-            print("    AUC: ", self.statistics["TEST"]["+"]["AUC"])
-            print("    Ya: ", self.statistics["TEST"]["+"]["Ya"])
-            print("    EF: ", self.statistics["TEST"]["+"]["EF"])
-            print("    REF: ", self.statistics["TEST"]["+"]["REF"])
-            print("STRATEGY ++:")
-            print("    ACC: ", self.statistics["TEST"]["++"]["ACC"])
-            print("    FPR: ", self.statistics["TEST"]["++"]["FPR"])
-            print("    AUC: ", self.statistics["TEST"]["++"]["AUC"])
-            print("    Ya: ", self.statistics["TEST"]["++"]["Ya"])
-            print("    EF: ", self.statistics["TEST"]["++"]["EF"])
-            print("    REF: ", self.statistics["TEST"]["++"]["REF"])
-            print("STRATEGY +-:")
-            print("    ACC: ", self.statistics["TEST"]["+-"]["ACC"])
-            print("    FPR: ", self.statistics["TEST"]["+-"]["FPR"])
-            print("    AUC: ", self.statistics["TEST"]["+-"]["AUC"])
-            print("    Ya: ", self.statistics["TEST"]["+-"]["Ya"])
-            print("    EF: ", self.statistics["TEST"]["+-"]["EF"])
-            print("    REF: ", self.statistics["TEST"]["+-"]["REF"])
-            print("STRATEGY ++--:")
-            print("    ACC: ", self.statistics["TEST"]["++--"]["ACC"])
-            print("    FPR: ", self.statistics["TEST"]["++--"]["FPR"])
-            print("    AUC: ", self.statistics["TEST"]["++--"]["AUC"])
-            print("    Ya: ", self.statistics["TEST"]["++--"]["Ya"])
-            print("    EF: ", self.statistics["TEST"]["++--"]["EF"])
-            print("    REF: ", self.statistics["TEST"]["++--"]["REF"])
-            print("#############################################")
+            s = ""
+            s = s + "#############################################\n"
+            s = s + "#############################################\n"
+            s = s + "---------------- STRATEGIES -----------------\n"
+            s = s + "Best Strategy: " + str(self.statistics["STRAT"]["best_strategy"]) + "\n"
+            s = s + "Cutoff Strategy +: " + str(self.statistics["STRAT"]["cutoffs"]["+"]) + "\n"
+            s = s + "Cutoff Strategy ++: " + str(self.statistics["STRAT"]["cutoffs"]["++"]) + "\n"
+            s = s + "Cutoff Strategy +-: " + str(self.statistics["STRAT"]["cutoffs"]["+-"]) + "\n"
+            s = s + "Cutoff Strategy ++--: " + str(self.statistics["STRAT"]["cutoffs"]["++--"]) + "\n"
+            s = s + "#############################################\n"
+            s = s + "----------- TRAINING DATA SUMMARY -----------\n"
+            s = s + "#############################################\n"
+            s = s + "STRATEGY +:\n"
+            s = s + "    ACC: " + str(self.statistics["TRAIN"]["+"]["ACC"]) + "\n"
+            s = s + "    FPR: " + str(self.statistics["TRAIN"]["+"]["FPR"]) + "\n"
+            s = s + "    AUC: " + str(self.statistics["TRAIN"]["+"]["AUC"]) + "\n"
+            s = s + "    Ya: " + str(self.statistics["TRAIN"]["+"]["Ya"]) + "\n"
+            s = s + "    EF: " + str(self.statistics["TRAIN"]["+"]["EF"]) + "\n"
+            s = s + "    REF: " + str(self.statistics["TRAIN"]["+"]["REF"]) + "\n"
+            s = s + "STRATEGY ++:\n"
+            s = s + "    ACC: " + str(self.statistics["TRAIN"]["++"]["ACC"]) + "\n"
+            s = s + "    FPR: " + str(self.statistics["TRAIN"]["++"]["FPR"]) + "\n"
+            s = s + "    AUC: " + str(self.statistics["TRAIN"]["++"]["AUC"]) + "\n"
+            s = s + "    Ya: " + str(self.statistics["TRAIN"]["++"]["Ya"]) + "\n"
+            s = s + "    EF: " + str(self.statistics["TRAIN"]["++"]["EF"]) + "\n"
+            s = s + "    REF: " + str(self.statistics["TRAIN"]["++"]["REF"]) + "\n"
+            s = s + "STRATEGY +-:\n"
+            s = s + "    ACC: " + str(self.statistics["TRAIN"]["+-"]["ACC"]) + "\n"
+            s = s + "    FPR: " + str(self.statistics["TRAIN"]["+-"]["FPR"]) + "\n"
+            s = s + "    AUC: " + str(self.statistics["TRAIN"]["+-"]["AUC"]) + "\n"
+            s = s + "    Ya: " + str(self.statistics["TRAIN"]["+-"]["Ya"]) + "\n"
+            s = s + "    EF: " + str(self.statistics["TRAIN"]["+-"]["EF"]) + "\n"
+            s = s + "    REF: " + str(self.statistics["TRAIN"]["+-"]["REF"]) + "\n"
+            s = s + "STRATEGY ++--:\n"
+            s = s + "    ACC: " + str(self.statistics["TRAIN"]["++--"]["ACC"]) + "\n"
+            s = s + "    FPR: " + str(self.statistics["TRAIN"]["++--"]["FPR"]) + "\n"
+            s = s + "    AUC: " + str(self.statistics["TRAIN"]["++--"]["AUC"]) + "\n"
+            s = s + "    Ya: " + str(self.statistics["TRAIN"]["++--"]["Ya"]) + "\n"
+            s = s + "    EF: " + str(self.statistics["TRAIN"]["++--"]["EF"]) + "\n"
+            s = s + "    REF: " + str(self.statistics["TRAIN"]["++--"]["REF"]) + "\n"
+            s = s + "#############################################\n"
+            s = s + "---------- VALIDATION DATA SUMMARY ----------\n"
+            s = s + "#############################################\n"
+            s = s + "STRATEGY +:\n"
+            s = s + "    ACC: " + str(self.statistics["VAL"]["+"]["ACC"]) + "\n"
+            s = s + "    FPR: " + str(self.statistics["VAL"]["+"]["FPR"]) + "\n"
+            s = s + "    AUC: " + str(self.statistics["VAL"]["+"]["AUC"]) + "\n"
+            s = s + "    Ya: " + str(self.statistics["VAL"]["+"]["Ya"]) + "\n"
+            s = s + "    EF: " + str(self.statistics["VAL"]["+"]["EF"]) + "\n"
+            s = s + "    REF: ", self.statistics["VAL"]["+"]["REF"]) + "\n"
+            s = s + "STRATEGY ++:\n"
+            s = s + "    ACC: " + str(self.statistics["VAL"]["++"]["ACC"]) + "\n"
+            s = s + "    FPR: " + str(self.statistics["VAL"]["++"]["FPR"]) + "\n"
+            s = s + "    AUC: " + str(self.statistics["VAL"]["++"]["AUC"]) + "\n"
+            s = s + "    Ya: " + str(self.statistics["VAL"]["++"]["Ya"]) + "\n"
+            s = s + "    EF: " + str(self.statistics["VAL"]["++"]["EF"]) + "\n"
+            s = s + "    REF: " + str(self.statistics["VAL"]["++"]["REF"]) + "\n"
+            s = s + "STRATEGY +-:\n"
+            s = s + "    ACC: " + str(self.statistics["VAL"]["+-"]["ACC"]) + "\n"
+            s = s + "    FPR: " + str(self.statistics["VAL"]["+-"]["FPR"]) + "\n"
+            s = s + "    AUC: " + str(self.statistics["VAL"]["+-"]["AUC"]) + "\n"
+            s = s + "    Ya: " + str(self.statistics["VAL"]["+-"]["Ya"]) + "\n"
+            s = s + "    EF: " + str(self.statistics["VAL"]["+-"]["EF"]) + "\n"
+            s = s + "    REF: " + str(self.statistics["VAL"]["+-"]["REF"]) + "\n"
+            s = s + "STRATEGY ++--:\n"
+            s = s + "    ACC: " + str(self.statistics["VAL"]["++--"]["ACC"]) + "\n"
+            s = s + "    FPR: " + str(self.statistics["VAL"]["++--"]["FPR"]) + "\n"
+            s = s + "    AUC: " + str(self.statistics["VAL"]["++--"]["AUC"]) + "\n"
+            s = s + "    Ya: " + str(self.statistics["VAL"]["++--"]["Ya"]) + "\n"
+            s = s + "    EF: " + str(self.statistics["VAL"]["++--"]["EF"]) + "\n"
+            s = s + "    REF: " + str(self.statistics["VAL"]["++--"]["REF"]) + "\n"
+            s = s + "#############################################\n"
+            s = s + "------------- TEST DATA SUMMARY -------------\n"
+            s = s + "#############################################\n"
+            s = s + "STRATEGY +:\n"
+            s = s + "    ACC: " + str(self.statistics["TEST"]["+"]["ACC"]) + "\n"
+            s = s + "    FPR: " + str(self.statistics["TEST"]["+"]["FPR"]) + "\n"
+            s = s + "    AUC: " + str(self.statistics["TEST"]["+"]["AUC"]) + "\n"
+            s = s + "    Ya: " + str(self.statistics["TEST"]["+"]["Ya"]) + "\n"
+            s = s + "    EF: " + str(self.statistics["TEST"]["+"]["EF"]) + "\n"
+            s = s + "    REF: " + str(self.statistics["TEST"]["+"]["REF"]) + "\n"
+            s = s + "STRATEGY ++:\n"
+            s = s + "    ACC: " + str(self.statistics["TEST"]["++"]["ACC"]) + "\n"
+            s = s + "    FPR: " + str(self.statistics["TEST"]["++"]["FPR"]) + "\n"
+            s = s + "    AUC: " + str(self.statistics["TEST"]["++"]["AUC"]) + "\n"
+            s = s + "    Ya: " + str(self.statistics["TEST"]["++"]["Ya"]) + "\n"
+            s = s + "    EF: " + str(self.statistics["TEST"]["++"]["EF"]) + "\n"
+            s = s + "    REF: " + str(self.statistics["TEST"]["++"]["REF"]) + "\n"
+            s = s + "STRATEGY +-:\n")
+            s = s + "    ACC: " + str(self.statistics["TEST"]["+-"]["ACC"]) + "\n"
+            s = s + "    FPR: " + str(self.statistics["TEST"]["+-"]["FPR"]) + "\n"
+            s = s + "    AUC: " + str(self.statistics["TEST"]["+-"]["AUC"]) + "\n"
+            s = s + "    Ya: " + str(self.statistics["TEST"]["+-"]["Ya"]) + "\n"
+            s = s + "    EF: " + str(self.statistics["TEST"]["+-"]["EF"]) + "\n"
+            s = s + "    REF: " + str(self.statistics["TEST"]["+-"]["REF"]) + "\n"
+            s = s + "STRATEGY ++--:\n"
+            s = s + "    ACC: " + str(self.statistics["TEST"]["++--"]["ACC"]) + "\n"
+            s = s + "    FPR: " + str(self.statistics["TEST"]["++--"]["FPR"]) + "\n"
+            s = s + "    AUC: " + str(self.statistics["TEST"]["++--"]["AUC"]) + "\n"
+            s = s + "    Ya: " + str(self.statistics["TEST"]["++--"]["Ya"]) + "\n"
+            s = s + "    EF: " + str(self.statistics["TEST"]["++--"]["EF"]) + "\n"
+            s = s + "    REF: " + str(self.statistics["TEST"]["++--"]["REF"]) + "\n"
+            s = s + "#############################################\n"
+            print(s)
+            if filename is not None:
+                with open(filename, "w", encoding = "utf-8") as f:
+                    f.write(s)
+                    f.close()
         else:
             print("No model statistics are available!")
 

@@ -73,7 +73,7 @@ def file_parser(list_of_files):
                 continue
             else:
                 continue
-        if f.split(".")[-1] == "sdf":
+        elif f.split(".")[-1] == "sdf":
             if sdf1 == None:
                 sdf1 = f
                 continue
@@ -82,21 +82,20 @@ def file_parser(list_of_files):
                 continue
             else:
                 continue
-        if f.split(".")[-1] == "txt":
-            if txt == None:
-                txt = f
-                continue
-            else:
-                continue
-        if f.split(".")[-1] == "piam":
+        elif f.split(".")[-1] == "piam":
             if piam == None:
                 piam = f
                 continue
             else:
                 continue
+        else:
+            if txt == None:
+                txt = f
+                continue
+            else:
+                continue
 
     return {"pdb": pdb, "sdf1": sdf1, "sdf2": sdf2, "txt": txt, "piam": piam}
-
 
 # extract interactions
 
@@ -287,7 +286,7 @@ def score(pdb_file, sdf_file_1, sdf_file_2 = None):
     cm_10 = plot_confusion_matrix(train_results["TEST"]["++"]["CM"], [0, 1], filename = output_name_prefix + "_cm_test_strat_pp.png")
     cm_11 = plot_confusion_matrix(train_results["TEST"]["+-"]["CM"], [0, 1], filename = output_name_prefix + "_cm_test_strat_pm.png")
     cm_12 = plot_confusion_matrix(train_results["TEST"]["++--"]["CM"], [0, 1], filename = output_name_prefix + "_cm_test_strat_ppmm.png")
-    model.summary()
+    model.summary(filename = output_name_prefix + "_summary.txt")
     model.save(output_name_prefix + "_best")
     model.change_strategy("+")
     model.save(output_name_prefix + "_p")
@@ -374,15 +373,33 @@ def main():
     files_dict = file_parser(args.files)
 
     if args.mode == "extract":
-        pass
+        if files_dict["sdf1"] is not None:
+            r = extract_sdf(files_dict["pdb"], files_dict["sdf1"])
+        else:
+            pdb_codes = txt_to_list(files_dict["txt"])
+            if os.path.isfile(pdb_codes[0]):
+                r = extract_pdbs(pdb_codes)
+            else:
+                r = extract_codes(pdb_codes)
     elif args.mode == "compare":
-        pass
+        r = compare(files_dict["pdb"], files_dict["sdf1"], files_dict["sdf2"])
     elif args.mode == "score":
-        pass
+        r = score(files_dict["pdb"], files_dict["sdf1"], files_dict["sdf2"])
     elif args.mode == "predict":
-        pass
+        if files_dict["sdf1"] is not None:
+            if files_dict["piam"] is not None:
+                r = predict_sdf(files_dict["piam"], files_dict["pdb"], files_dict["sdf1"])
+            else:
+                r = predict_sdf(txt_to_list(files_dict["txt"]), files_dict["pdb"], files_dict["sdf1"], cutoff = args.cutoff)
+        else:
+            if files_dict["piam"] is not None:
+                r = predict_pdb(files_dict["piam"], files_dict["pdb"])
+            else:
+                r = predict_pdb(txt_to_list(files_dict["txt"]), files_dict["pdb"], cutoff = args.cutoff)
     else:
-        pass
+        r = 1
+
+    return r
 
 if __name__ == '__main__':
     r = main()

@@ -1,0 +1,1 @@
+Hydrogen_Bond:TYR383A,Hydrogen_Bond:ASP335A,Pi-Stacking:TRP336A,Hydrogen_Bond:TYR466A,Pi-Stacking:HIS524A

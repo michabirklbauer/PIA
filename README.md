@@ -1,6 +1,4 @@
-# PIA
-
-**PIA - Protein Interaction Analyzer**
+# PIA - Protein Interaction Analyzer
 
 Extract protein-ligand interactions and their frequencies to score and predict the activity of a complex.
 

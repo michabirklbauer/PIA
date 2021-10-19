@@ -4,6 +4,8 @@ Extract protein-ligand interactions and their frequencies to score and predict t
 
 ## Docker Usage
 
+If not already installed: [Install Docker.](https://docs.docker.com/engine/install/)
+
 Either manually build the image using the provided Dockerfile:
 
 ```bash

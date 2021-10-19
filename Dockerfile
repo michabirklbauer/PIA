@@ -38,6 +38,5 @@ RUN mkdir exchange
 RUN mkdir PIA
 
 COPY PIAScript.py PIA
-COPY PIAScript.py /bin
 
 CMD  ["/bin/bash"]

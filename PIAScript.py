@@ -20,6 +20,18 @@ ARGUMENTS:
 -m --mode: workflow, can be any of "extract", "compare", "score" and "predict"
 -f --file: files to be processed
 -c --cutoff: cutoff, optional for if interactions are provided for scoring
+-tr --train: training csv, optional, for training a model from csv
+-vl --val: validation csv, optional, for training a model from csv
+-te --test: test csv, optional, for training a model from csv
+-ft --features: features csv, optional, for training a model from csv
+-p --poses: poses to analyze, optional, either "all" or "best", default: "best"
+-a --absolutes: get absolute frequencies instead of normalized ones, optional
+-co --cond-operator: conditional operator for IC50 based scoring, optional,
+                     default: >=
+-ic --ic50: IC50 target value for IC50 based scoring, optional, default: 1000
+-by --by: labelling of molecules, either by "name" or by "ic50", optional,
+          default: "name"
+--version: print version
 """
 
 import os
@@ -101,7 +113,7 @@ def file_parser(list_of_files):
 #### -------------------------- PIASCRIPT MODES --------------------------- ####
 
 # workflow extract - input mode 1: pdb codes
-def extract_codes(list_of_codes):
+def extract_codes(list_of_codes, normalize = True):
 
     """
     -- DESCRIPTION --
@@ -119,7 +131,7 @@ def extract_codes(list_of_codes):
 
     # extract interactions and frequencies
     output_name_prefix = datetime.now().strftime("%b-%d-%Y_%H-%M-%S")
-    result = PIA(filenames)
+    result = PIA(filenames, normalize = normalize)
     p = result.plot("Analysis of PDB Codes", filename = output_name_prefix + "_analysis.png")
     r = result.save(output_name_prefix + "_analysis", True)
     c = result.to_csv(output_name_prefix + "_analysis.csv")
@@ -131,7 +143,7 @@ def extract_codes(list_of_codes):
     return result
 
 # workflow extract - input mode 2: pdb files
-def extract_pdbs(list_of_files):
+def extract_pdbs(list_of_files, normalize = True):
 
     """
     -- DESCRIPTION --
@@ -140,7 +152,7 @@ def extract_pdbs(list_of_files):
 
     # extract interactions and frequencies
     output_name_prefix = datetime.now().strftime("%b-%d-%Y_%H-%M-%S")
-    result = PIA(list_of_files)
+    result = PIA(list_of_files, normalize = normalize)
     p = result.plot("Analysis of PDB files", filename = output_name_prefix + "_analysis.png")
     r = result.save(output_name_prefix + "_analysis", True)
     c = result.to_csv(output_name_prefix + "_analysis.csv")
@@ -148,7 +160,7 @@ def extract_pdbs(list_of_files):
     return result
 
 # workflow extract - input mode 3: sdf file
-def extract_sdf(pdb_file, sdf_file):
+def extract_sdf(pdb_file, sdf_file, poses = "best", normalize = True):
 
     """
     -- DESCRIPTION --
@@ -168,7 +180,7 @@ def extract_sdf(pdb_file, sdf_file):
     sdf_metainfo = p.get_sdf_metainfo(sdf_file)
     ligand_names = sdf_metainfo["names"]
     structures = p.add_ligands_multi(pdb_file.split(".pdb")[0] + "_cleaned.pdb", "piascript_structures_tmp", ligands)
-    result = PIA(structures, ligand_names = ligand_names, poses = "best", path = "current")
+    result = PIA(structures, ligand_names = ligand_names, poses = poses, path = "current", normalize = normalize)
     p = result.plot("Analysis of SDF ligands", filename = output_name_prefix + "_analysis.png")
     r = result.save(output_name_prefix + "_analysis", True, True)
     c = result.to_csv(output_name_prefix + "_analysis.csv")
@@ -180,7 +192,7 @@ def extract_sdf(pdb_file, sdf_file):
     return result
 
 # workflow compare - input mode 1: one/two sdf file(s)
-def compare(pdb_file, sdf_file_1, sdf_file_2 = None):
+def compare(pdb_file, sdf_file_1, sdf_file_2 = None, poses = "best"):
 
     """
     -- DESCRIPTION --
@@ -222,13 +234,13 @@ def compare(pdb_file, sdf_file_1, sdf_file_2 = None):
     inactives_names = [ligand_names[i] for i in inactives_idx]
 
     # actives
-    result_1 = PIA(actives_structures, ligand_names = actives_names, poses = "best", path = "current")
+    result_1 = PIA(actives_structures, ligand_names = actives_names, poses = poses, path = "current")
     p_1 = result.plot("Active complexes", filename = output_name_prefix + "_actives_analysis.png")
     r_1 = result.save(output_name_prefix + "_actives_analysis", True, True)
     c_1 = result.to_csv(output_name_prefix + "_actives_analysis.csv")
 
     # inactives
-    result_2 = PIA(inactives_structures, ligand_names = inactives_names, poses = "best", path = "current")
+    result_2 = PIA(inactives_structures, ligand_names = inactives_names, poses = poses, path = "current")
     p_2 = result.plot("Inactive complexes", filename = output_name_prefix + "_inactives_analysis.png")
     r_2 = result.save(output_name_prefix + "_inactives_analysis", True, True)
     c_2 = result.to_csv(output_name_prefix + "_inactives_analysis.csv")
@@ -246,7 +258,7 @@ def compare(pdb_file, sdf_file_1, sdf_file_2 = None):
     return [result_1, result_2, comparison]
 
 # workflow score - input mode 1: one/two sdf file(s)
-def score(pdb_file, sdf_file_1, sdf_file_2 = None):
+def score(pdb_file, sdf_file_1, sdf_file_2 = None, poses = "best", test_size = 0.3, val_size = 0.3, labels_by = "name", condition_operator = ">=", condition_value = 1000):
 
     """
     -- DESCRIPTION --
@@ -255,11 +267,91 @@ def score(pdb_file, sdf_file_1, sdf_file_2 = None):
     """
 
     # output file prefix
-    output_name_prefix = sdf_file.split(".sdf")[0] + datetime.now().strftime("%b-%d-%Y_%H-%M-%S")
+    output_name_prefix = sdf_file_1.split(".sdf")[0] + datetime.now().strftime("%b-%d-%Y_%H-%M-%S")
 
     # train model
     model = PIAModel()
-    train_results = model.train(pdb_file, sdf_file_1, sdf_file_2, plot_prefix = output_name_prefix, keep_files = True)
+    train_results = model.train(pdb_file, sdf_file_1, sdf_file_2,
+                                poses = poses, test_size = test_size, val_size = val_size,
+                                labels_by = labels_by, condition_operator = condition_operator, condition_value = condition_value,
+                                plot_prefix = output_name_prefix,  keep_files = True)
+
+    # print condition if molecules are labelled by ic50
+    if labels_by == "ic50":
+        print("Molecules with IC50 " + condition_operator + " " + str(condition_value) + " are labelled as decoys!")
+
+    # save plots - ROC
+    p_1 = plot_ROC_curve(train_results["TRAIN"]["+"]["ROC"]["fpr"], train_results["TRAIN"]["+"]["ROC"]["tpr"],
+                         filename = output_name_prefix + "_roc_train_strat_p.png")
+    p_2 = plot_ROC_curve(train_results["TRAIN"]["++"]["ROC"]["fpr"], train_results["TRAIN"]["++"]["ROC"]["tpr"],
+                         filename = output_name_prefix + "_roc_train_strat_pp.png")
+    p_3 = plot_ROC_curve(train_results["TRAIN"]["+-"]["ROC"]["fpr"], train_results["TRAIN"]["+-"]["ROC"]["tpr"],
+                         filename = output_name_prefix + "_roc_train_strat_pm.png")
+    p_4 = plot_ROC_curve(train_results["TRAIN"]["++--"]["ROC"]["fpr"], train_results["TRAIN"]["++--"]["ROC"]["tpr"],
+                         filename = output_name_prefix + "_roc_train_strat_ppmm.png")
+    p_5 = plot_ROC_curve(train_results["VAL"]["+"]["ROC"]["fpr"], train_results["VAL"]["+"]["ROC"]["tpr"],
+                         filename = output_name_prefix + "_roc_val_strat_p.png")
+    p_6 = plot_ROC_curve(train_results["VAL"]["++"]["ROC"]["fpr"], train_results["VAL"]["++"]["ROC"]["tpr"],
+                         filename = output_name_prefix + "_roc_val_strat_pp.png")
+    p_7 = plot_ROC_curve(train_results["VAL"]["+-"]["ROC"]["fpr"], train_results["VAL"]["+-"]["ROC"]["tpr"],
+                         filename = output_name_prefix + "_roc_val_strat_pm.png")
+    p_8 = plot_ROC_curve(train_results["VAL"]["++--"]["ROC"]["fpr"], train_results["VAL"]["++--"]["ROC"]["tpr"],
+                         filename = output_name_prefix + "_roc_val_strat_ppmm.png")
+    p_9 = plot_ROC_curve(train_results["TEST"]["+"]["ROC"]["fpr"], train_results["TEST"]["+"]["ROC"]["tpr"],
+                         filename = output_name_prefix + "_roc_test_strat_p.png")
+    p_10 = plot_ROC_curve(train_results["TEST"]["++"]["ROC"]["fpr"], train_results["TEST"]["++"]["ROC"]["tpr"],
+                         filename = output_name_prefix + "_roc_test_strat_pp.png")
+    p_11 = plot_ROC_curve(train_results["TEST"]["+-"]["ROC"]["fpr"], train_results["TEST"]["+-"]["ROC"]["tpr"],
+                         filename = output_name_prefix + "_roc_test_strat_pm.png")
+    p_12 = plot_ROC_curve(train_results["TEST"]["++--"]["ROC"]["fpr"], train_results["TEST"]["++--"]["ROC"]["tpr"],
+                         filename = output_name_prefix + "_roc_test_strat_ppmm.png")
+
+    # save plots - CM
+    cm_1 = plot_confusion_matrix(train_results["TRAIN"]["+"]["CM"], [0, 1], filename = output_name_prefix + "_cm_train_strat_p.png")
+    cm_2 = plot_confusion_matrix(train_results["TRAIN"]["++"]["CM"], [0, 1], filename = output_name_prefix + "_cm_train_strat_pp.png")
+    cm_3 = plot_confusion_matrix(train_results["TRAIN"]["+-"]["CM"], [0, 1], filename = output_name_prefix + "_cm_train_strat_pm.png")
+    cm_4 = plot_confusion_matrix(train_results["TRAIN"]["++--"]["CM"], [0, 1], filename = output_name_prefix + "_cm_train_strat_ppmm.png")
+    cm_5 = plot_confusion_matrix(train_results["VAL"]["+"]["CM"], [0, 1], filename = output_name_prefix + "_cm_val_strat_p.png")
+    cm_6 = plot_confusion_matrix(train_results["VAL"]["++"]["CM"], [0, 1], filename = output_name_prefix + "_cm_val_strat_pp.png")
+    cm_7 = plot_confusion_matrix(train_results["VAL"]["+-"]["CM"], [0, 1], filename = output_name_prefix + "_cm_val_strat_pm.png")
+    cm_8 = plot_confusion_matrix(train_results["VAL"]["++--"]["CM"], [0, 1], filename = output_name_prefix + "_cm_val_strat_ppmm.png")
+    cm_9 = plot_confusion_matrix(train_results["TEST"]["+"]["CM"], [0, 1], filename = output_name_prefix + "_cm_test_strat_p.png")
+    cm_10 = plot_confusion_matrix(train_results["TEST"]["++"]["CM"], [0, 1], filename = output_name_prefix + "_cm_test_strat_pp.png")
+    cm_11 = plot_confusion_matrix(train_results["TEST"]["+-"]["CM"], [0, 1], filename = output_name_prefix + "_cm_test_strat_pm.png")
+    cm_12 = plot_confusion_matrix(train_results["TEST"]["++--"]["CM"], [0, 1], filename = output_name_prefix + "_cm_test_strat_ppmm.png")
+
+    # print and save summary statistics
+    model.summary(filename = output_name_prefix + "_summary.txt")
+
+    # save models
+    model.save(output_name_prefix + "_best")
+    model.change_strategy("+")
+    model.save(output_name_prefix + "_p")
+    model.change_strategy("++")
+    model.save(output_name_prefix + "_pp")
+    model.change_strategy("+-")
+    model.save(output_name_prefix + "_pm")
+    model.change_strategy("++--")
+    model.save(output_name_prefix + "_ppmm")
+    model.change_strategy("best")
+
+    return model
+
+# workflow score - input mode 2: train, val, test, features csv files
+def score_csv(train_csv, val_csv, test_csv, features_csv):
+
+    """
+    -- DESCRIPTION --
+    Train a scoring model from from preprocessed CSV files. All results
+    including model files are saved in the current directory.
+    """
+
+    # output file prefix
+    output_name_prefix = train_csv.split(".csv")[0] + datetime.now().strftime("%b-%d-%Y_%H-%M-%S")
+
+    # train model
+    model = PIAModel()
+    train_results = model.train_from_csv(train_csv, val_csv, test_csv, features_csv)
 
     # save plots - ROC
     p_1 = plot_ROC_curve(train_results["TRAIN"]["+"]["ROC"]["fpr"], train_results["TRAIN"]["+"]["ROC"]["tpr"],
@@ -392,6 +484,9 @@ def main():
                         help = "cutoff for scoring model",
                         type = int
                         )
+    parser.add_argument("--version",
+                        action = "version",
+                        version = version)
     args = parser.parse_args()
 
     # get supplied files

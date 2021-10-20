@@ -29,6 +29,13 @@ from PIA.PIA import Comparison
 from PIA.PIA import exclusion_list
 from plip.structure.preparation import PDBComplex
 
+class NoLabelsError(RuntimeError):
+    """
+    -- DESCRIPTION --
+    Raised if labelling condition is not recognized.
+    """
+    pass
+
 class PIAModel:
     """
     -- DESCRIPTION --
@@ -113,11 +120,11 @@ class PIAModel:
                 quality metrics and parameters from training that are available
                 immediately if model was loaded from file (ii) or after training
                 (iii)
-                  -> see line 368 for complete structure of the dictionary
+                  -> see line 387 for complete structure of the dictionary
             - train_results (dict of dicts):
                 additional quality metrics from training that are only available
                 if the model was trained (iii)
-                  -> see line 346 for complete structure of the dictionary
+                  -> see line 365 for complete structure of the dictionary
             - plot_train (matplotlib.pyplot.figure object):
                 plot of interaction frequencies of actives and inactives in the
                 training partition, only available if model was trained (iii)
@@ -150,6 +157,12 @@ class PIAModel:
               pdb_base_structure,
               sdf_file_1,
               sdf_file_2 = None,
+              poses = "best",
+              test_size = 0.3,
+              val_size = 0.3,
+              labels_by = "name",
+              condition_operator = ">=",
+              condition_value = 1000,
               plot_prefix = None,
               keep_files = False,
               block = False,
@@ -174,6 +187,42 @@ class PIAModel:
                 in their name if to classify them as inactive, active ligands
                 MUST NOT contain these terms
                 DEFAULT: None
+            - poses (string): one of "all", "best".
+                if multiple poses of the same ligand are present (e.g. from
+                docking) either all are analyzed or just the best (the pose with
+                the most interactions).
+                "best" only works if the molecules are named in the GOLD schema
+                e.g. 'LIG1_active|ligand|sdf|1|dock1'
+                DEFAULT: "best"
+            - test_size (float; interval (0,1)):
+                size of the test partition / fraction of the whole dataset
+                DEFAULT: 0.3 (30% of the whole dataset used for testing)
+            - val_size (float; intervall (0,1)):
+                size of the validation partition fraction of the remaining 70%
+                that is not used for testing
+                DEFAULT: 0.3 (30% of the remaining 70% is used for validation)
+            - labels_by (string): one of "name", "ic50"
+                label molecules as active/inactive based on name or ic50 value,
+                if "ic50" is specified the user may supply a
+                "condition_operator" and "condition_value" (see below)
+                DEFAULT: "name" (label by name)
+            - condition_operator (string): one of "==", "!=", "<=", "<", ">=",
+                                                  ">".
+                The molecule is labelled as inactive if the IC50 value is
+                "condition_operator" "condition_value" e.g. if
+                "condition_operator" is ">=" and "condition_value" is "1000"
+                then all molecules where "IC50 >= 1000" are labelled as inactive
+                with subfix "_decoy". Any molecule that does not have an IC50
+                value is not labelled
+                DEFAULT: ">="
+            - condition_value (int or float): reference value
+                The molecule is labelled as inactive if the IC50 value is
+                "condition_operator" "condition_value" e.g. if
+                "condition_operator" is ">=" and "condition_value" is "1000"
+                then all molecules where "IC50 >= 1000" are labelled as inactive
+                with subfix "_decoy". Any molecule that does not have an IC50
+                value is not labelled
+                DEFAULT: 1000
             - plot_prefix (string):
                 optional path/filename prefix for plots if they should be saved,
                 if None is supplied the plots will not be saved
@@ -193,7 +242,7 @@ class PIAModel:
           RETURNS:
             - train_results (dict of dicts):
                 quality metrics from training
-                  -> see line 346 for complete structure of the dictionary
+                  -> see line 365 for complete structure of the dictionary
         """
 
         # create necessary directories
@@ -224,16 +273,25 @@ class PIAModel:
         # preprocessing
         p = Preparation()
         pdb = p.remove_ligands(pdb_base_structure, pdb_base_structure + "_cleaned.pdb")
-        ligands = p.get_ligands(filename)
-        sdf_metainfo = p.get_sdf_metainfo(filename)
-        ligand_names = sdf_metainfo["names"]
+        if labels_by == "name":
+            ligands = p.get_ligands(filename)
+            sdf_metainfo = p.get_sdf_metainfo(filename)
+            ligand_names = sdf_metainfo["names"]
+        elif labels_by == "ic50":
+            ligands_info = p.get_labeled_names(filename, condition_operator, condition_value)
+            ligands = ligands_info["ligands"]
+            ligand_names = ligands_info["names"]
+        else:
+            raise NoLabelsError(str(labels_by) + " not recognized! Can't label molecules!")
         structures = p.add_ligands_multi(pdb_base_structure + "_cleaned.pdb", "piamodel_structures_tmp", ligands, verbose = verbose)
         # PIA
-        result = PIA(structures, ligand_names = ligand_names, poses = "best", path = "current", verbose = verbose)
+        result = PIA(structures, ligand_names = ligand_names, poses = poses, path = "current", verbose = verbose)
         # scoring preparation
         s = Scoring(result.pdb_entry_results, result.best_pdb_entries)
         # generate datasets
-        data_train, data_val, data_test = s.generate_datasets(train_output = "piamodel_data_train_tmp.csv",
+        data_train, data_val, data_test = s.generate_datasets(test_size = test_size,
+                                                              val_size = val_size,
+                                                              train_output = "piamodel_data_train_tmp.csv",
                                                               val_output = "piamodel_data_val_tmp.csv",
                                                               test_output = "piamodel_data_test_tmp.csv")
         # compare actives and inactives
@@ -409,6 +467,190 @@ class PIAModel:
             os.remove("piamodel_data_val_tmp.csv")
             os.remove("piamodel_data_test_tmp.csv")
             os.remove("piamodel_features_tmp.csv")
+
+        # return results
+        return self.train_results
+
+    # train model from csv files (optional)
+    def train_from_csv(self,
+                       data_train_csv,
+                       data_val_csv,
+                       data_test_csv,
+                       features_csv,
+                       verbose = 1):
+
+        """
+        -- DESCRIPTION --
+        Train a scoring model from preprocessed CSV files.
+          PARAMS:
+            - data_test_csv (string):
+                name of the csv file for the training partition
+            - data_val_csv (string):
+                name of the csv file for the validation partition
+            - data_test_csv (string):
+                name of the csv file for the test partition
+            - features_csv (string):
+                name of the csv file for feature information
+            - verbose (bool/0 or 1):
+                print additional training infos to std ouput
+                DEFAULT: 1 (information will be printed to std output)
+          RETURNS:
+            - train_results (dict of dicts):
+                quality metrics from training
+                  -> see line 365 for complete structure of the dictionary
+        """
+
+        # load data
+        data_train = pd.read_csv(data_train_csv)
+        data_val = pd.read_csv(data_val_csv)
+        data_test = pd.read_csv(data_test_csv)
+        features = pd.read_csv(features_csv)
+
+        # scoring
+        # get optimal features
+        if verbose:
+            print("Trying to find optimal features...")
+        optimized_values_raw = PIAScore.get_optimized_feature_thresholds(features, data_train, data_val)
+        opt_key, opt_value = list(islice(optimized_values_raw["ACC"].items(), 1))[0]
+        diff_threshold = float(opt_key.split(",")[0].strip())
+        active_threshold = float(opt_key.split(",")[1].strip())
+        inactive_threshold = float(opt_key.split(",")[2].split(":")[0].strip())
+        strat = opt_key.split(":")[-1].strip()
+        # filter features
+        features_filtered = PIAScore.get_relevant_features(features, diff_threshold, active_threshold, inactive_threshold)
+        if verbose:
+            print("Finished optimal feature calculation!")
+        # get feature impact
+        self.positives, self.negatives = PIAScore.get_feature_impact(features_filtered)
+        positives = self.positives
+        negatives = self.negatives
+        # prepare training, validation and test data
+        ## make data copies
+        train_result_strat1 = data_train.copy()
+        train_result_strat2 = data_train.copy()
+        train_result_strat3 = data_train.copy()
+        train_result_strat4 = data_train.copy()
+        ## calculate scores
+        train_result_strat1["SCORE"] = train_result_strat1.apply(lambda x: PIAScore.score(x, positives, negatives, "+"), axis = 1)
+        train_result_strat2["SCORE"] = train_result_strat2.apply(lambda x: PIAScore.score(x, positives, negatives, "++"), axis = 1)
+        train_result_strat3["SCORE"] = train_result_strat3.apply(lambda x: PIAScore.score(x, positives, negatives, "+-"), axis = 1)
+        train_result_strat4["SCORE"] = train_result_strat4.apply(lambda x: PIAScore.score(x, positives, negatives, "++--"), axis = 1)
+        ## sort data
+        train_result_strat1_sorted = train_result_strat1.sort_values(by = "SCORE", ascending = False)
+        train_result_strat2_sorted = train_result_strat2.sort_values(by = "SCORE", ascending = False)
+        train_result_strat3_sorted = train_result_strat3.sort_values(by = "SCORE", ascending = False)
+        train_result_strat4_sorted = train_result_strat4.sort_values(by = "SCORE", ascending = False)
+        # determine cutoffs
+        cutoff_strat1 = PIAScore.get_cutoff(train_result_strat1["LABEL"].to_list(), train_result_strat1["SCORE"].to_list())[0]
+        cutoff_strat2 = PIAScore.get_cutoff(train_result_strat2["LABEL"].to_list(), train_result_strat2["SCORE"].to_list())[0]
+        cutoff_strat3 = PIAScore.get_cutoff(train_result_strat3["LABEL"].to_list(), train_result_strat3["SCORE"].to_list())[0]
+        cutoff_strat4 = PIAScore.get_cutoff(train_result_strat4["LABEL"].to_list(), train_result_strat4["SCORE"].to_list())[0]
+        ## make data copies
+        val_result_strat1 = data_val.copy()
+        val_result_strat2 = data_val.copy()
+        val_result_strat3 = data_val.copy()
+        val_result_strat4 = data_val.copy()
+        ## calculate scores
+        val_result_strat1["SCORE"] = val_result_strat1.apply(lambda x: PIAScore.score(x, positives, negatives, "+"), axis = 1)
+        val_result_strat2["SCORE"] = val_result_strat2.apply(lambda x: PIAScore.score(x, positives, negatives, "++"), axis = 1)
+        val_result_strat3["SCORE"] = val_result_strat3.apply(lambda x: PIAScore.score(x, positives, negatives, "+-"), axis = 1)
+        val_result_strat4["SCORE"] = val_result_strat4.apply(lambda x: PIAScore.score(x, positives, negatives, "++--"), axis = 1)
+        ## sort data
+        val_result_strat1_sorted = val_result_strat1.sort_values(by = "SCORE", ascending = False)
+        val_result_strat2_sorted = val_result_strat2.sort_values(by = "SCORE", ascending = False)
+        val_result_strat3_sorted = val_result_strat3.sort_values(by = "SCORE", ascending = False)
+        val_result_strat4_sorted = val_result_strat4.sort_values(by = "SCORE", ascending = False)
+        ## make data copies
+        test_result_strat1 = data_test.copy()
+        test_result_strat2 = data_test.copy()
+        test_result_strat3 = data_test.copy()
+        test_result_strat4 = data_test.copy()
+        ## calculate scores
+        test_result_strat1["SCORE"] = test_result_strat1.apply(lambda x: PIAScore.score(x, positives, negatives, "+"), axis = 1)
+        test_result_strat2["SCORE"] = test_result_strat2.apply(lambda x: PIAScore.score(x, positives, negatives, "++"), axis = 1)
+        test_result_strat3["SCORE"] = test_result_strat3.apply(lambda x: PIAScore.score(x, positives, negatives, "+-"), axis = 1)
+        test_result_strat4["SCORE"] = test_result_strat4.apply(lambda x: PIAScore.score(x, positives, negatives, "++--"), axis = 1)
+        ## sort data
+        test_result_strat1_sorted = test_result_strat1.sort_values(by = "SCORE", ascending = False)
+        test_result_strat2_sorted = test_result_strat2.sort_values(by = "SCORE", ascending = False)
+        test_result_strat3_sorted = test_result_strat3.sort_values(by = "SCORE", ascending = False)
+        test_result_strat4_sorted = test_result_strat4.sort_values(by = "SCORE", ascending = False)
+        # set optimal cutoff and strategy
+        if strat == "strat1":
+            best_strategy = "+"
+            self.strategy = "+"
+            self.cutoff = cutoff_strat1
+        elif strat == "strat2":
+            best_strategy = "++"
+            self.strategy = "++"
+            self.cutoff = cutoff_strat2
+        elif strat == "strat3":
+            best_strategy = "+-"
+            self.strategy = "+-"
+            self.cutoff = cutoff_strat3
+        elif strat == "strat4":
+            best_strategy = "+--"
+            self.strategy = "++--"
+            self.cutoff = cutoff_strat4
+        # this should never happen
+        else:
+            warnings.warn("Strategy key not detected! This should not happen!", UserWarning)
+        # evaluation
+        self.train_results = {"TRAIN":
+                                {
+                                "+": PIAScore.get_metrics(train_result_strat1, cutoff_strat1),
+                                "++": PIAScore.get_metrics(train_result_strat2, cutoff_strat2),
+                                "+-": PIAScore.get_metrics(train_result_strat3, cutoff_strat3),
+                                "++--": PIAScore.get_metrics(train_result_strat4, cutoff_strat4)
+                                },
+                              "VAL":
+                                {
+                                "+": PIAScore.get_metrics(val_result_strat1, cutoff_strat1),
+                                "++": PIAScore.get_metrics(val_result_strat2, cutoff_strat2),
+                                "+-": PIAScore.get_metrics(val_result_strat3, cutoff_strat3),
+                                "++--": PIAScore.get_metrics(val_result_strat4, cutoff_strat4)
+                                },
+                              "TEST":
+                              {
+                              "+": PIAScore.get_metrics(test_result_strat1, cutoff_strat1),
+                              "++": PIAScore.get_metrics(test_result_strat2, cutoff_strat2),
+                              "+-": PIAScore.get_metrics(test_result_strat3, cutoff_strat3),
+                              "++--": PIAScore.get_metrics(test_result_strat4, cutoff_strat4)
+                              }
+                            }
+        self.statistics = {"STRAT":
+                            {
+                            "best_strategy": best_strategy,
+                            "cutoffs":
+                                {
+                                "+": cutoff_strat1,
+                                "++": cutoff_strat2,
+                                "+-": cutoff_strat3,
+                                "++--": cutoff_strat4
+                                }
+                            },
+                           "TRAIN":
+                            {
+                            "+": PIAScore.get_metrics(train_result_strat1, cutoff_strat1, pretty_print = True),
+                            "++": PIAScore.get_metrics(train_result_strat2, cutoff_strat2, pretty_print = True),
+                            "+-": PIAScore.get_metrics(train_result_strat3, cutoff_strat3, pretty_print = True),
+                            "++--": PIAScore.get_metrics(train_result_strat4, cutoff_strat4, pretty_print = True)
+                            },
+                           "VAL":
+                            {
+                            "+": PIAScore.get_metrics(val_result_strat1, cutoff_strat1, pretty_print = True),
+                            "++": PIAScore.get_metrics(val_result_strat2, cutoff_strat2, pretty_print = True),
+                            "+-": PIAScore.get_metrics(val_result_strat3, cutoff_strat3, pretty_print = True),
+                            "++--": PIAScore.get_metrics(val_result_strat4, cutoff_strat4, pretty_print = True)
+                            },
+                           "TEST":
+                            {
+                            "+": PIAScore.get_metrics(test_result_strat1, cutoff_strat1, pretty_print = True),
+                            "++": PIAScore.get_metrics(test_result_strat2, cutoff_strat2, pretty_print = True),
+                            "+-": PIAScore.get_metrics(test_result_strat3, cutoff_strat3, pretty_print = True),
+                            "++--": PIAScore.get_metrics(test_result_strat4, cutoff_strat4, pretty_print = True)
+                            }
+                           }
 
         # return results
         return self.train_results

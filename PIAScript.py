@@ -481,8 +481,66 @@ def main():
                         )
     parser.add_argument("-c", "--cutoff",
                         dest = "cutoff",
+                        default = None,
                         help = "cutoff for scoring model",
                         type = int
+                        )
+    parser.add_argument("-tr", "--train",
+                        dest = "train",
+                        default = None,
+                        help = "training data CSV file",
+                        type = str
+                        )
+    parser.add_argument("-vl", "--val",
+                        dest = "val",
+                        default = None,
+                        help = "validation data CSV file",
+                        type = str
+                        )
+    parser.add_argument("-te", "--test",
+                        dest = "test",
+                        default = None,
+                        help = "test data CSV file",
+                        type = str
+                        )
+    parser.add_argument("-ft", "--features",
+                        dest = "features",
+                        default = None,
+                        help = "feature information CSV file",
+                        type = str
+                        )
+    parser.add_argument("-p", "--poses",
+                        choices = ("all", "best"),
+                        dest = "poses",
+                        default = "best",
+                        help = "whether to analyze all or only best poses",
+                        type = str
+                        )
+    parser.add_argument("-a", "--absolutes",
+                        action = "store_false",
+                        dest = "normalize",
+                        default = True,
+                        help = "get absolute interaction frequencies"
+                        )
+    parser.add_argument("-co", "--cond-operator",
+                        choices = ("==", "!=", "<=", "<", ">=", ">"),
+                        dest = "condition_operator",
+                        default = ">=",
+                        help = "conditional operator for IC50 based scoring",
+                        type = str
+                        )
+    parser.add_argument("-ic", "--ic50",
+                        dest = "condition_value",
+                        default = 1000,
+                        help = "IC50 target value for IC50 based scoring",
+                        type = int
+                        )
+    parser.add_argument("-by", "--by",
+                        choices = ("name", "ic50"),
+                        dest = "by",
+                        default = "name",
+                        help = "label molecules by name or IC50 value",
+                        type = str
                         )
     parser.add_argument("--version",
                         action = "version",
@@ -496,7 +554,7 @@ def main():
     if args.mode == "extract":
         if files_dict["sdf1"] is not None:
             if files_dict["pdb"] is not None:
-                r = extract_sdf(files_dict["pdb"], files_dict["sdf1"])
+                r = extract_sdf(files_dict["pdb"], files_dict["sdf1"], normalize = args.normalize)
             else:
                 print("ERROR: PDB file is required but none was provided. Exiting!")
                 r = 1
@@ -508,24 +566,27 @@ def main():
                     if not os.path.isfile(pdb_codes[0]):
                         files_exist = False
                 if files_exist:
-                    r = extract_pdbs(pdb_codes)
+                    r = extract_pdbs(pdb_codes, normalize = args.normalize)
                 else:
-                    r = extract_codes(pdb_codes)
+                    r = extract_codes(pdb_codes, normalize = args.normalize)
             else:
                 print("ERROR: TXT file of PDB codes or structures is required but none was provided. Exiting!")
                 r = 1
     elif args.mode == "compare":
         if files_dict["pdb"] is not None and files_dict["sdf1"] is not None:
-            r = compare(files_dict["pdb"], files_dict["sdf1"], files_dict["sdf2"])
+            r = compare(files_dict["pdb"], files_dict["sdf1"], files_dict["sdf2"], poses = args.poses)
         else:
             print("ERROR: PDB file and SDF file are required but at least one of them was not provided. Exiting!")
             r = 1
     elif args.mode == "score":
         if files_dict["pdb"] is not None and files_dict["sdf1"] is not None:
-            r = score(files_dict["pdb"], files_dict["sdf1"], files_dict["sdf2"])
+            r = score(files_dict["pdb"], files_dict["sdf1"], files_dict["sdf2"], poses = args.poses, labels_by = args.by, condition_operator = args.condition_operator, condition_value = args.condition_value)
         else:
-            print("ERROR: PDB file and SDF file are required but at least one of them was not provided. Exiting!")
-            r = 1
+            if args.train is not None and args.val is not None and args.test is not None and args.features is not None:
+                r = score_csv(args.train, args.val, args.test, args.features)
+            else:
+                print("ERROR: PDB file + SDF / four CSV data files are required but at least one of them was not provided. Exiting!")
+                r = 1
     elif args.mode == "predict":
         if files_dict["pdb"] is not None:
             if files_dict["sdf1"] is not None:

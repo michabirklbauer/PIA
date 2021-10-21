@@ -473,8 +473,8 @@ def main():
                         type = str
                         )
     parser.add_argument("-f", "--file",
-                        required = True,
                         dest = "files",
+                        default = [],
                         help = "files to process",
                         type = str,
                         nargs = "+"

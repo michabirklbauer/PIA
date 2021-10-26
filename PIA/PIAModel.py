@@ -1032,10 +1032,12 @@ class PIAModel:
         shutil.rmtree("piamodel_structures_tmp")
         os.remove(pdb_base_structure + "_cleaned.pdb")
 
+        # create csv
+        csv = pd.DataFrame({"NAME": names, "SCORE": scores, "PREDICTION": predictions}).sort_values(by = "SCORE", ascending = False)
+
         # save csv
         if save_csv:
-            csv = pd.DataFrame({"NAME": names, "SCORE": scores, "PREDICTION": predictions})
             csv.to_csv(sdf_file + ".csv")
 
-        # return ligand names, scores and predictions
-        return {"names": names, "scores": scores, "predictions": predictions}
+        # return ligand names, scores, predictions and dataframe
+        return {"names": names, "scores": scores, "predictions": predictions, "dataframe": csv}

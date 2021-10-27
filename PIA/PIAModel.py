@@ -863,9 +863,10 @@ class PIAModel:
           PARAMS:
             - pdb_file (string): path/filename of the complex in PDB format
           RETURNS:
-            - dict with keys "name" (string, filename of the complex), "score"
-              (int, the score of the complex) and "prediction" (string, "active"
-              or "inactive", the prediction of the complex)
+            - dict with keys "names" (string, filename of the complex), "scores"
+              (int, the score of the complex), "predictions" (string, "active"
+              or "inactive", the prediction of the complex) and "dataframe"
+              containing the result as a pandas dataframe
         """
 
         # set PIA params
@@ -960,8 +961,11 @@ class PIAModel:
         else:
             prediction = "inactive"
 
+        # create csv
+        csv = pd.DataFrame({"NAME": [pdb_file], "SCORE": [score], "PREDICTION": [prediction]})
+
         # return filename, score and prediction
-        return {"name": pdb_file, "score": score, "prediction": prediction}
+        return {"names": pdb_file, "scores": score, "predictions": prediction, "dataframe": csv}
 
     # predict multiple ligands from a sdf file
     def predict_sdf(self,
@@ -995,7 +999,8 @@ class PIAModel:
               complexes) and "predictions" (list of strings, "active" or
               "inactive", the predictions of the complexs) where
               dict["names"][i] corresponds to dict["scores"][i] and
-              dict["predictions"][i]
+              dict["predictions"][i], the results as a pandas dataframe via key
+              "dataframe" (sorted by score, descending)
         """
 
         # init return values

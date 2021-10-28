@@ -17,10 +17,12 @@ scoring data, parameters and thresholds to apply them to new data.
 import os
 import json
 import shutil
+import random
 import warnings
 import numpy as np
 import pandas as pd
 from itertools import islice
+from datetime import datetime
 from PIA import PIAScore
 from PIA.PIA import PIA
 from PIA.PIA import Preparation
@@ -165,6 +167,7 @@ class PIAModel:
               condition_value = 1000,
               plot_prefix = None,
               keep_files = False,
+              tmp_dir_name = "piamodel_structures_tmp",
               block = False,
               verbose = 1):
 
@@ -231,6 +234,10 @@ class PIAModel:
                 if temporary files that are created during training should be
                 kept after the training is finished or not
                 DEFAULT: False (files are not kept)
+            - tmp_dir_name (string):
+                name of the temporary directory that will be created (and
+                deleted) to store intermediate files
+                DEFAULT: "piamodel_structures_tmp"
             - block (bool):
                 if matplotlib should wait for closing all plot windows before
                 continuing or return immediately
@@ -245,9 +252,11 @@ class PIAModel:
                   -> see line 365 for complete structure of the dictionary
         """
 
+        # create unique file prefix
+        output_name_prefix = sdf_file_1.split(".sdf")[0] + datetime.now().strftime("%b-%d-%Y_%H-%M-%S") + "_" + str(random.randint(10000, 99999))
+
         # create necessary directories
-        structures_directory = "piamodel_structures_tmp"
-        structures_path = os.path.join(os.getcwd(), structures_directory)
+        structures_path = os.path.join(os.getcwd(), tmp_dir_name)
         os.mkdir(structures_path)
 
         # read files
@@ -264,11 +273,11 @@ class PIAModel:
             # combine actives and inactives
             content = actives + inactives
             # create combo file
-            with open("piamodel_combo_tmp.sdf", "w") as f:
+            with open(output_name_prefix + "_piamodel_combo_tmp.sdf", "w") as f:
                 f.write(content)
                 f.close()
             # set filename
-            filename = "piamodel_combo_tmp.sdf"
+            filename = output_name_prefix + "_piamodel_combo_tmp.sdf"
 
         # preprocessing
         p = Preparation()
@@ -283,7 +292,7 @@ class PIAModel:
             ligand_names = ligands_info["names"]
         else:
             raise NoLabelsError(str(labels_by) + " not recognized! Can't label molecules!")
-        structures = p.add_ligands_multi(pdb_base_structure + "_cleaned.pdb", "piamodel_structures_tmp", ligands, verbose = verbose)
+        structures = p.add_ligands_multi(pdb_base_structure + "_cleaned.pdb", tmp_dir_name, ligands, verbose = verbose)
         # PIA
         result = PIA(structures, ligand_names = ligand_names, poses = poses, path = "current", verbose = verbose)
         # scoring preparation
@@ -291,16 +300,16 @@ class PIAModel:
         # generate datasets
         data_train, data_val, data_test = s.generate_datasets(test_size = test_size,
                                                               val_size = val_size,
-                                                              train_output = "piamodel_data_train_tmp.csv",
-                                                              val_output = "piamodel_data_val_tmp.csv",
-                                                              test_output = "piamodel_data_test_tmp.csv")
+                                                              train_output = output_name_prefix + "_piamodel_data_train_tmp.csv",
+                                                              val_output = output_name_prefix + "_piamodel_data_val_tmp.csv",
+                                                              test_output = output_name_prefix + "_piamodel_data_test_tmp.csv")
         # compare actives and inactives
         ia_info = s.get_actives_inactives()
         comp_train = s.compare(partition = "train")
         comp_val = s.compare(partition = "val")
         comp_test = s.compare(partition = "test")
         # get feature names and information
-        features = s.get_feature_information(filename = "piamodel_features_tmp.csv")
+        features = s.get_feature_information(filename = output_name_prefix + "_piamodel_features_tmp.csv")
         # plot comparisons, if plot_prefix is specified save them
         if plot_prefix is not None:
             self.plot_train = comp_train.plot("Actives vs. Inactives - Training Set", filename = plot_prefix + "_comparison_train.png", block = block)
@@ -458,15 +467,15 @@ class PIAModel:
                            }
 
         # cleanup
-        shutil.rmtree("piamodel_structures_tmp")
+        shutil.rmtree(tmp_dir_name)
         if not keep_files:
             if sdf_file_2 is not None:
-                os.remove("piamodel_combo_tmp.sdf")
+                os.remove(output_name_prefix + "_piamodel_combo_tmp.sdf")
             os.remove(pdb_base_structure + "_cleaned.pdb")
-            os.remove("piamodel_data_train_tmp.csv")
-            os.remove("piamodel_data_val_tmp.csv")
-            os.remove("piamodel_data_test_tmp.csv")
-            os.remove("piamodel_features_tmp.csv")
+            os.remove(output_name_prefix + "_piamodel_data_train_tmp.csv")
+            os.remove(output_name_prefix + "_piamodel_data_val_tmp.csv")
+            os.remove(output_name_prefix + "_piamodel_data_test_tmp.csv")
+            os.remove(output_name_prefix + "_piamodel_features_tmp.csv")
 
         # return results
         return self.train_results
@@ -855,13 +864,16 @@ class PIAModel:
 
     # predict a single pdb file
     def predict_pdb(self,
-                    pdb_file):
+                    pdb_file,
+                    name = None):
 
         """
         -- DESCRIPTION --
         Score/Predict a single protein-ligand complex in PDB format.
           PARAMS:
             - pdb_file (string): path/filename of the complex in PDB format
+            - name (string): name of the complex
+              DEFAULT: the PDB filename
           RETURNS:
             - dict with keys "name" (string, filename of the complex), "score"
               (int, the score of the complex), "prediction" (string, "active"
@@ -961,6 +973,9 @@ class PIAModel:
         else:
             prediction = "inactive"
 
+        if name != None:
+            pdb_file = name
+
         # create csv
         csv = pd.DataFrame({"NAME": [pdb_file], "SCORE": [score], "PREDICTION": [prediction]})
 
@@ -972,6 +987,7 @@ class PIAModel:
                     pdb_base_structure,
                     sdf_file,
                     save_csv = False,
+                    tmp_dir_name = "piamodel_structures_tmp",
                     verbose = 1):
 
         """
@@ -990,6 +1006,10 @@ class PIAModel:
               the current working directory with filename of the SDF file +
               ".csv"
               DEFAULT: False (results are not saved)
+            - tmp_dir_name (string):
+              name of the temporary directory that will be created (and deleted)
+              to store intermediate files
+              DEFAULT: "piamodel_structures_tmp"
             - verbose (bool/0 or 1):
               should additional info be printed during the prediction process
               DEFAULT: 1 (information will be printed to std output)
@@ -1009,8 +1029,7 @@ class PIAModel:
         predictions = []
 
         # create necessary directories
-        structures_directory = "piamodel_structures_tmp"
-        structures_path = os.path.join(os.getcwd(), structures_directory)
+        structures_path = os.path.join(os.getcwd(), tmp_dir_name)
         os.mkdir(structures_path)
 
         # prepare files
@@ -1023,7 +1042,7 @@ class PIAModel:
         sdf_metainfo = p.get_sdf_metainfo(sdf_file)
         ligand_names = sdf_metainfo["names"]
         # write ligands into PDB files
-        structures = p.add_ligands_multi(pdb_base_structure + "_cleaned.pdb", "piamodel_structures_tmp", ligands)
+        structures = p.add_ligands_multi(pdb_base_structure + "_cleaned.pdb", tmp_dir_name, ligands)
         # analyze structures
         for i, structure in enumerate(structures):
             result = self.predict_pdb(structure)
@@ -1034,7 +1053,7 @@ class PIAModel:
                 print("Analyzed structure ", i + 1, "!")
 
         # cleanup
-        shutil.rmtree("piamodel_structures_tmp")
+        shutil.rmtree(tmp_dir_name)
         os.remove(pdb_base_structure + "_cleaned.pdb")
 
         # create csv

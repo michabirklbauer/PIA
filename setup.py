@@ -5,7 +5,7 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
     name = "PIA",
-    version = "1.0.0",
+    version = "1.0.1",
     author = "Micha Johannes Birklbauer",
     author_email = "micha.birklbauer@gmail.com",
     description = "PIA - Protein Interaction Analyzer. Extract protein-ligand interactions and their frequencies to score and predict the activity of a complex.",

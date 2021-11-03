@@ -220,28 +220,43 @@ class Preparation:
 
     # get names and GOLD fitness from sdf file
     def get_sdf_metainfo(self,
-                         sdf_file):
+                         sdf_file,
+                         force_scores = False):
 
         """
         -- DESCRIPTION --
         This is a wrapper function that combines get_sdf_names() and
         get_sdf_fitness() with additional constraint checking to ensure
         correct results. If the number of molecule names is not equal to the
-        number of fitness scores a "ParseError" will be raised.
+        number of fitness scores and PARAM "force_scores" is set to "True" a
+        "ParseError" will be raised.
           PARAMS:
             - sdf_file (string): path to a SDF file
+            - force_scores (bool): force integrity check for GOLD scores
+                DEFAULT: False
           RETURNS:
             - dictionary with keys "names" (list of strings) and "scores" (list
-              of floats)
+              of floats/list of None if GOLD score is not available)
         """
 
         names = self.get_sdf_names(sdf_file)
-        scores = self.get_sdf_fitness(sdf_file)
+        try:
+            scores = self.get_sdf_fitness(sdf_file)
+            scores_available = True
+        except Exception as e:
+            scores = [None for name in names]
+            scores_available = False
 
-        if len(names) == len(scores):
-            return {"names": names, "fitness": scores}
+        if force_scores:
+            if scores_available:
+                if len(names) == len(scores):
+                    return {"names": names, "fitness": scores}
+                else:
+                    raise ParseError("SDF file could not be parsed [nr of names != nr of scores].")
+            else:
+                raise ParseError("SDF file could not be parsed [nr of names != nr of scores].")
         else:
-            raise ParseError("SDF file could not be parsed [nr of names != nr of scores].")
+            return {"names": names, "fitness": scores}
 
     # label names as active or decoy depending on IC50
     def get_labeled_names(self,

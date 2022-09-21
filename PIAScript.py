@@ -554,7 +554,7 @@ def main():
     if args.mode == "extract":
         if files_dict["sdf1"] is not None:
             if files_dict["pdb"] is not None:
-                r = extract_sdf(files_dict["pdb"], files_dict["sdf1"], normalize = args.normalize)
+                r = extract_sdf(files_dict["pdb"], files_dict["sdf1"], poses = args.poses, normalize = args.normalize)
             else:
                 print("ERROR: PDB file is required but none was provided. Exiting!")
                 r = 1

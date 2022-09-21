@@ -6,6 +6,8 @@ Extract protein-ligand interactions and their frequencies to score and predict t
 
 If not already installed: [Install Docker.](https://docs.docker.com/engine/install/)
 
+A short manual how to install Docker can be found here: [Docker Installation.](https://github.com/michabirklbauer/PIA/blob/master/DOCKER.md)
+
 Either manually build the image using the provided Dockerfile:
 
 ```bash

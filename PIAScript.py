@@ -5,8 +5,8 @@
 # https://github.com/michabirklbauer/
 # micha.birklbauer@gmail.com
 
-version = "1.0.0"
-date = "20211007"
+version = "1.0.1"
+date = "20220921"
 
 """
 DESCRIPTION
@@ -220,7 +220,7 @@ def compare(pdb_file, sdf_file_1, sdf_file_2 = None, poses = "best"):
         filename = "compare_combo_tmp.sdf"
 
     # extract interactions and frequencies
-    output_name_prefix = sdf_file.split(".sdf")[0] + datetime.now().strftime("%b-%d-%Y_%H-%M-%S")
+    output_name_prefix = sdf_file_1.split(".sdf")[0] + datetime.now().strftime("%b-%d-%Y_%H-%M-%S")
     p = Preparation()
     pdb = p.remove_ligands(pdb_file, pdb_file.split(".pdb")[0] + "_cleaned.pdb")
     ligands = p.get_ligands(filename)
@@ -235,15 +235,15 @@ def compare(pdb_file, sdf_file_1, sdf_file_2 = None, poses = "best"):
 
     # actives
     result_1 = PIA(actives_structures, ligand_names = actives_names, poses = poses, path = "current")
-    p_1 = result.plot("Active complexes", filename = output_name_prefix + "_actives_analysis.png")
-    r_1 = result.save(output_name_prefix + "_actives_analysis", True, True)
-    c_1 = result.to_csv(output_name_prefix + "_actives_analysis.csv")
+    p_1 = result_1.plot("Active complexes", filename = output_name_prefix + "_actives_analysis.png")
+    r_1 = result_1.save(output_name_prefix + "_actives_analysis", True, True)
+    c_1 = result_1.to_csv(output_name_prefix + "_actives_analysis.csv")
 
     # inactives
     result_2 = PIA(inactives_structures, ligand_names = inactives_names, poses = poses, path = "current")
-    p_2 = result.plot("Inactive complexes", filename = output_name_prefix + "_inactives_analysis.png")
-    r_2 = result.save(output_name_prefix + "_inactives_analysis", True, True)
-    c_2 = result.to_csv(output_name_prefix + "_inactives_analysis.csv")
+    p_2 = result_2.plot("Inactive complexes", filename = output_name_prefix + "_inactives_analysis.png")
+    r_2 = result_2.save(output_name_prefix + "_inactives_analysis", True, True)
+    c_2 = result_2.to_csv(output_name_prefix + "_inactives_analysis.csv")
 
     # actives vs inactives
     comparison = Comparison("Actives", "Inactives", result_1.i_frequencies, result_2.i_frequencies)
@@ -554,7 +554,7 @@ def main():
     if args.mode == "extract":
         if files_dict["sdf1"] is not None:
             if files_dict["pdb"] is not None:
-                r = extract_sdf(files_dict["pdb"], files_dict["sdf1"], normalize = args.normalize)
+                r = extract_sdf(files_dict["pdb"], files_dict["sdf1"], poses = args.poses, normalize = args.normalize)
             else:
                 print("ERROR: PDB file is required but none was provided. Exiting!")
                 r = 1

@@ -235,15 +235,15 @@ def compare(pdb_file, sdf_file_1, sdf_file_2 = None, poses = "best"):
 
     # actives
     result_1 = PIA(actives_structures, ligand_names = actives_names, poses = poses, path = "current")
-    p_1 = result.plot("Active complexes", filename = output_name_prefix + "_actives_analysis.png")
-    r_1 = result.save(output_name_prefix + "_actives_analysis", True, True)
-    c_1 = result.to_csv(output_name_prefix + "_actives_analysis.csv")
+    p_1 = result_1.plot("Active complexes", filename = output_name_prefix + "_actives_analysis.png")
+    r_1 = result_1.save(output_name_prefix + "_actives_analysis", True, True)
+    c_1 = result_1.to_csv(output_name_prefix + "_actives_analysis.csv")
 
     # inactives
     result_2 = PIA(inactives_structures, ligand_names = inactives_names, poses = poses, path = "current")
-    p_2 = result.plot("Inactive complexes", filename = output_name_prefix + "_inactives_analysis.png")
-    r_2 = result.save(output_name_prefix + "_inactives_analysis", True, True)
-    c_2 = result.to_csv(output_name_prefix + "_inactives_analysis.csv")
+    p_2 = result_2.plot("Inactive complexes", filename = output_name_prefix + "_inactives_analysis.png")
+    r_2 = result_2.save(output_name_prefix + "_inactives_analysis", True, True)
+    c_2 = result_2.to_csv(output_name_prefix + "_inactives_analysis.csv")
 
     # actives vs inactives
     comparison = Comparison("Actives", "Inactives", result_1.i_frequencies, result_2.i_frequencies)

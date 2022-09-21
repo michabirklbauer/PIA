@@ -220,7 +220,7 @@ def compare(pdb_file, sdf_file_1, sdf_file_2 = None, poses = "best"):
         filename = "compare_combo_tmp.sdf"
 
     # extract interactions and frequencies
-    output_name_prefix = sdf_file.split(".sdf")[0] + datetime.now().strftime("%b-%d-%Y_%H-%M-%S")
+    output_name_prefix = sdf_file_1.split(".sdf")[0] + datetime.now().strftime("%b-%d-%Y_%H-%M-%S")
     p = Preparation()
     pdb = p.remove_ligands(pdb_file, pdb_file.split(".pdb")[0] + "_cleaned.pdb")
     ligands = p.get_ligands(filename)
